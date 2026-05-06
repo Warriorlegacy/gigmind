@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
 import { Send, Bot, User, MapPin, Briefcase, IndianRupee, Clock, X, ArrowRight, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
 import type { ExtractedJob } from '@/lib/ai/agents'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
@@ -29,6 +30,7 @@ export default function AIChatPage() {
   const [showJobCard, setShowJobCard] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [sessionId, setSessionId] = useState<string>('')
+  const [posting, setPosting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -91,37 +93,54 @@ export default function AIChatPage() {
 
     if (!extracted) return
 
-    const { data: category } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('slug', extracted.category_slug)
-      .maybeSingle()
+    setPosting(true)
+    try {
+      const { data: category } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', extracted.category_slug)
+        .maybeSingle()
 
-    if (!category) return
+      if (!category) {
+        toast.error('Category not found')
+        return
+      }
 
-    const { data: job } = await supabase
-      .from('jobs')
-      .insert({
-        hirer_id: user.id,
-        category_id: category.id,
-        title: extracted.title,
-        description: extracted.description,
-        location_text: extracted.location_text,
-        city: extracted.city,
-        budget_min: extracted.budget_min,
-        budget_max: extracted.budget_max,
-        budget_type: extracted.budget_type,
-        duration: extracted.duration,
-        requirements: extracted.requirements,
-        start_date: extracted.start_date,
-        ai_extracted_data: extracted,
-        status: 'open',
-      })
-      .select('id')
-      .single()
+      const { data: job, error } = await supabase
+        .from('jobs')
+        .insert({
+          hirer_id: user.id,
+          category_id: category.id,
+          title: extracted.title,
+          description: extracted.description,
+          location_text: extracted.location_text,
+          city: extracted.city,
+          budget_min: extracted.budget_min,
+          budget_max: extracted.budget_max,
+          budget_type: extracted.budget_type,
+          duration: extracted.duration,
+          requirements: extracted.requirements,
+          start_date: extracted.start_date,
+          ai_extracted_data: extracted,
+          status: 'open',
+        })
+        .select('id')
+        .single()
 
-    if (job) {
-      router.push(`/jobs/${job.id}`)
+      if (error) {
+        toast.error(`Failed to post job: ${error.message}`)
+        return
+      }
+
+      if (job) {
+        toast.success('Job posted successfully!')
+        router.push(`/jobs/${job.id}`)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to post job'
+      toast.error(message)
+    } finally {
+      setPosting(false)
     }
   }
 
@@ -309,9 +328,10 @@ export default function AIChatPage() {
 
                   <button
                     onClick={handlePostJob}
-                    className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                    disabled={posting}
+                    className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
                   >
-                    Post This Job <ArrowRight className="w-4 h-4" />
+                    {posting ? 'Posting...' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
                   </button>
 
                   {!user && (
@@ -357,8 +377,12 @@ export default function AIChatPage() {
                         <span className="text-sm text-muted-foreground">{extracted.duration || 'Not specified'}</span>
                       </div>
                     </div>
-                    <button onClick={handlePostJob} className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium flex items-center justify-center gap-2">
-                      Post This Job <ArrowRight className="w-4 h-4" />
+                    <button
+                      onClick={handlePostJob}
+                      disabled={posting}
+                      className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+                    >
+                      {posting ? 'Posting...' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
                     </button>
                   </div>
                 </div>
