@@ -109,21 +109,42 @@ export default function AIChatPage() {
         return
       }
 
+      const validBudgetTypes = ['hourly', 'daily', 'project', 'negotiable']
+      const safeBudgetType = validBudgetTypes.includes(extracted.budget_type)
+        ? extracted.budget_type
+        : 'negotiable'
+
+      const safeBudgetMin = extracted.budget_min && !isNaN(Number(extracted.budget_min))
+        ? Number(extracted.budget_min)
+        : null
+
+      const safeBudgetMax = extracted.budget_max && !isNaN(Number(extracted.budget_max))
+        ? Number(extracted.budget_max)
+        : null
+
+      let safeStartDate = null
+      if (extracted.start_date) {
+        const parsed = Date.parse(extracted.start_date)
+        if (!isNaN(parsed)) {
+          safeStartDate = new Date(parsed).toISOString().split('T')[0]
+        }
+      }
+
       const { data: job, error } = await supabase
         .from('jobs')
         .insert({
           hirer_id: user.id,
           category_id: category.id,
-          title: extracted.title,
-          description: extracted.description,
-          location_text: extracted.location_text,
-          city: extracted.city,
-          budget_min: extracted.budget_min,
-          budget_max: extracted.budget_max,
-          budget_type: extracted.budget_type,
-          duration: extracted.duration,
-          requirements: extracted.requirements,
-          start_date: extracted.start_date,
+          title: extracted.title || 'Service Request',
+          description: extracted.description || 'Details not provided.',
+          location_text: extracted.location_text || '',
+          city: extracted.city || '',
+          budget_min: safeBudgetMin,
+          budget_max: safeBudgetMax,
+          budget_type: safeBudgetType,
+          duration: extracted.duration || '',
+          requirements: extracted.requirements || '',
+          start_date: safeStartDate,
           ai_extracted_data: extracted,
           status: 'open',
         })
