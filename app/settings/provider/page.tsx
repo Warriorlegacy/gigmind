@@ -36,6 +36,7 @@ export default function ProviderSettingsPage() {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [profile, setProfile] = useState<any>(null)
   const [userId, setUserId] = useState<string>('')
   const [providerId, setProviderId] = useState<string>('')
   const router = useRouter()
@@ -69,19 +70,27 @@ export default function ProviderSettingsPage() {
     if (!user) { router.push('/login'); return }
     setUserId(user.id)
 
-    const { data: profile } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('city')
+      .select('city, role')
       .eq('id', user.id)
       .maybeSingle()
 
-    if (profile?.city) setCity(profile.city)
+    if (profileData) {
+      setProfile(profileData)
+      if (profileData.city) setCity(profileData.city)
+    }
 
-    const { data: provider } = await supabase
+    const { data: provider, error: fetchError } = await supabase
       .from('provider_profiles')
       .select('*, provider_categories(category_id, categories(slug))')
       .eq('user_id', user.id)
       .maybeSingle()
+
+    if (fetchError) {
+      console.error('Error fetching provider profile:', fetchError)
+      return
+    }
 
     if (provider) {
       setProviderId(provider.id)
@@ -147,58 +156,98 @@ export default function ProviderSettingsPage() {
 
     setSaving(true)
     try {
-      let finalProviderId = providerId
+      console.log('Starting save process...', { providerId, userId, tagline, city, selectedCategories })
 
-      if (providerId) {
-        const { error } = await supabase.from('provider_profiles').update({
-          tagline, bio, experience_years: experienceYears, availability,
-          languages, rate_hourly: rateHourly ? parseFloat(rateHourly) : null,
-          rate_daily: rateDaily ? parseFloat(rateDaily) : null,
-          rate_project_min: rateProjectMin ? parseFloat(rateProjectMin) : null,
-          rate_project_max: rateProjectMax ? parseFloat(rateProjectMax) : null,
-          service_radius_km: serviceRadius,
-        }).eq('id', providerId)
+      // 1. Update primary profile (City and Role) first
+      const currentRole = profile?.role || 'hirer'
+      let newRole = currentRole
+      if (currentRole === 'hirer') newRole = 'both'
+      
+      console.log('Updating user profile...', { city, newRole })
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          city,
+          role: newRole 
+        })
+        .eq('id', userId)
 
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase.from('provider_profiles').insert({
-          user_id: userId, tagline, bio, experience_years: experienceYears, availability,
-          languages, rate_hourly: rateHourly ? parseFloat(rateHourly) : null,
-          rate_daily: rateDaily ? parseFloat(rateDaily) : null,
-          rate_project_min: rateProjectMin ? parseFloat(rateProjectMin) : null,
-          rate_project_max: rateProjectMax ? parseFloat(rateProjectMax) : null,
-          service_radius_km: serviceRadius,
-        }).select('id').single()
-
-        if (error) throw error
-        if (data) {
-          finalProviderId = data.id
-          setProviderId(data.id)
-        }
+      if (profileError) {
+        console.error('Update user profile error:', profileError)
+        toast.error(`Profile update error: ${profileError.message}`)
+        throw profileError
       }
 
-      // Update categories
-      if (finalProviderId && selectedCategories.length > 0) {
-        const { data: cats, error: catError } = await supabase.from('categories').select('id, slug').in('slug', selectedCategories)
-        if (catError) throw catError
-
-        if (cats) {
-          await supabase.from('provider_categories').delete().eq('provider_id', finalProviderId)
-          const { error: insertError } = await supabase.from('provider_categories').insert(
-            cats.map(c => ({ provider_id: finalProviderId, category_id: c.id }))
-          )
-          if (insertError) throw insertError
-        }
+      // 2. Upsert provider-specific profile
+      const providerData = {
+        user_id: userId,
+        tagline,
+        bio,
+        experience_years: experienceYears,
+        availability,
+        languages,
+        rate_hourly: rateHourly ? parseFloat(rateHourly) : null,
+        rate_daily: rateDaily ? parseFloat(rateDaily) : null,
+        rate_project_min: rateProjectMin ? parseFloat(rateProjectMin) : null,
+        rate_project_max: rateProjectMax ? parseFloat(rateProjectMax) : null,
+        service_radius_km: serviceRadius,
       }
 
-      // Update city on profile
-      const { error: profileError } = await supabase.from('profiles').update({ city }).eq('id', userId)
-      if (profileError) throw profileError
+      console.log('Upserting provider profile...')
+      const { data: upsertData, error: providerError } = await supabase
+        .from('provider_profiles')
+        .upsert(providerData, { onConflict: 'user_id' })
+        .select('id')
+      
+      if (providerError) {
+        console.error('Provider profile upsert error:', providerError)
+        throw providerError
+      }
+      
+      let finalProviderId = upsertData?.[0]?.id || providerId
+      
+      if (!finalProviderId) {
+        const { data: existing } = await supabase
+          .from('provider_profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (existing) finalProviderId = existing.id
+      }
+
+      if (finalProviderId) {
+        setProviderId(finalProviderId)
+        console.log('Provider profile saved with ID:', finalProviderId)
+        
+        // 3. Update categories
+        if (selectedCategories.length > 0) {
+          const { data: cats } = await supabase
+            .from('categories')
+            .select('id, slug')
+            .in('slug', selectedCategories)
+
+          if (cats && cats.length > 0) {
+            await supabase
+              .from('provider_categories')
+              .delete()
+              .eq('provider_id', finalProviderId)
+
+            await supabase
+              .from('provider_categories')
+              .insert(
+                cats.map(c => ({ provider_id: finalProviderId, category_id: c.id }))
+              )
+          }
+        }
+      }
 
       toast.success('Profile saved successfully!')
-      setTimeout(() => router.push('/dashboard'), 1500)
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 1000)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save profile'
+      console.error('Final save error:', err)
       toast.error(message)
     }
     setSaving(false)
