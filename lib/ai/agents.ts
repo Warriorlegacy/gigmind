@@ -91,7 +91,7 @@ Paragraph 3: Work style + why clients should hire them`
 
   const completion = await groq.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
-    model: 'mixtral-8x7b-32768',
+    model: 'llama-3.1-8b-instant',
     max_tokens: 400,
     temperature: 0.7,
   })
