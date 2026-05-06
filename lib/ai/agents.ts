@@ -118,7 +118,7 @@ highlight relevant experience, mention the amount naturally, end with clear call
 
   const completion = await groq.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
-    model: 'mixtral-8x7b-32768',
+    model: 'llama-3.1-8b-instant',
     max_tokens: 300,
     temperature: 0.7,
   })
