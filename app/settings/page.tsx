@@ -22,7 +22,7 @@ export default function SettingsPage() {
       if (profile?.role === 'provider' || profile?.role === 'both') {
         router.push('/settings/provider')
       } else {
-        router.push('/dashboard')
+        router.push('/settings/hirer')
       }
     }
     redirect()
