@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
-import { Save, Sparkles, ArrowRight, ArrowLeft, CircleCheck as CheckCircle, Upload, MapPin } from 'lucide-react'
+import { Save, Sparkles, ArrowRight, ArrowLeft, CircleCheck as CheckCircle, Upload, MapPin, Trash2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 
 const CATEGORIES = [
@@ -39,6 +39,9 @@ export default function ProviderSettingsPage() {
   const [profile, setProfile] = useState<any>(null)
   const [userId, setUserId] = useState<string>('')
   const [providerId, setProviderId] = useState<string>('')
+  const [portfolioItems, setPortfolioItems] = useState<any[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -105,6 +108,15 @@ export default function ProviderSettingsPage() {
       setRateProjectMax(provider.rate_project_max?.toString() || '')
       setServiceRadius(provider.service_radius_km || 20)
       setSelectedCategories(provider.provider_categories?.map((pc: any) => pc.categories?.slug).filter(Boolean) || [])
+      
+      // Load portfolio items
+      const { data: items } = await supabase
+        .from('portfolio_items')
+        .select('*')
+        .eq('provider_id', provider.id)
+        .order('created_at', { ascending: false })
+      
+      if (items) setPortfolioItems(items)
     }
 
     setAiAnswers(prev => ({ ...prev, name: user.user_metadata?.full_name || '' }))
@@ -241,6 +253,28 @@ export default function ProviderSettingsPage() {
         }
       }
 
+      // 4. Save new portfolio items (if any)
+      const newItems = portfolioItems.filter(item => item.isNew)
+      if (newItems.length > 0 && finalProviderId) {
+        console.log('Saving new portfolio items...', newItems.length)
+        const { error: portfolioError } = await supabase
+          .from('portfolio_items')
+          .insert(
+            newItems.map(item => ({
+              provider_id: finalProviderId,
+              title: item.title,
+              media_url: item.media_url,
+              media_type: item.media_type
+            }))
+          )
+        
+        if (portfolioError) {
+          console.error('Save portfolio items error:', portfolioError)
+          // Don't throw, just warn
+          toast.error('Failed to save some portfolio items')
+        }
+      }
+
       toast.success('Profile saved successfully!')
       setTimeout(() => {
         window.location.href = '/dashboard'
@@ -251,6 +285,85 @@ export default function ProviderSettingsPage() {
       toast.error(message)
     }
     setSaving(false)
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !userId) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File too large (max 5MB)')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${userId}/${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('portfolios')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('portfolios')
+        .getPublicUrl(filePath)
+
+      // Save to database immediately or add to local state?
+      // Better to save immediately if we have providerId, else add to state for later
+      if (providerId) {
+        const { data: newItem, error: itemError } = await supabase
+          .from('portfolio_items')
+          .insert({
+            provider_id: providerId,
+            title: file.name,
+            media_url: publicUrl,
+            media_type: file.type.startsWith('image/') ? 'image' : (file.type === 'application/pdf' ? 'pdf' : 'image')
+          })
+          .select()
+          .single()
+        
+        if (itemError) throw itemError
+        setPortfolioItems(prev => [newItem, ...prev])
+        toast.success('File uploaded successfully!')
+      } else {
+        // Just add to local state to be saved when profile is created
+        setPortfolioItems(prev => [{
+          title: file.name,
+          media_url: publicUrl,
+          media_type: file.type.startsWith('image/') ? 'image' : (file.type === 'application/pdf' ? 'pdf' : 'image'),
+          isNew: true
+        }, ...prev])
+        toast.success('File added to portfolio. Save profile to finalize.')
+      }
+    } catch (err) {
+      console.error('Upload error:', err)
+      toast.error('Failed to upload file')
+    }
+    setUploading(false)
+  }
+
+  const removePortfolioItem = async (id: string, isNew?: boolean) => {
+    if (isNew) {
+      setPortfolioItems(prev => prev.filter(item => item.media_url !== id))
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('portfolio_items')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      setPortfolioItems(prev => prev.filter(item => item.id !== id))
+      toast.success('Item removed')
+    } catch (err) {
+      toast.error('Failed to remove item')
+    }
   }
 
   const toggleCategory = (slug: string) => {
@@ -463,14 +576,58 @@ export default function ProviderSettingsPage() {
 
             {step === 5 && (
               <div className="space-y-5 animate-fade-in">
-                <h2 className="font-display font-bold text-white text-lg">Portfolio</h2>
-                <p className="text-muted-foreground text-sm">Upload images of your past work (max 5)</p>
-                <div className="border-2 border-dashed border-surface-border rounded-2xl p-8 text-center hover:border-brand/30 transition-colors cursor-pointer">
-                  <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground text-sm">Drag & drop images here or click to upload</p>
-                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 5MB each</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-display font-bold text-white text-lg">Portfolio</h2>
+                    <p className="text-muted-foreground text-sm">Upload images of your past work (max 5)</p>
+                  </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept="image/*,application/pdf"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || portfolioItems.length >= 5}
+                    className="px-4 py-2 rounded-xl bg-surface border border-surface-border text-white text-sm font-medium hover:bg-surface-hover transition-colors disabled:opacity-50"
+                  >
+                    {uploading ? 'Uploading...' : 'Add Item'}
+                  </button>
                 </div>
-                <p className="text-xs text-muted-foreground">Portfolio upload requires Supabase Storage setup. Connect your storage bucket to enable this feature.</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {portfolioItems.map((item, idx) => (
+                    <div key={item.id || idx} className="group relative aspect-video rounded-xl overflow-hidden bg-surface border border-surface-border">
+                      {item.media_type === 'image' ? (
+                        <img src={item.media_url} alt={item.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                          <FileText className="w-8 h-8 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground px-2 text-center truncate w-full">{item.title}</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          onClick={() => removePortfolioItem(item.id || item.media_url, item.isNew)}
+                          className="p-2 rounded-full bg-error/20 text-error hover:bg-error/30 transition-colors"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {portfolioItems.length === 0 && !uploading && (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="col-span-2 border-2 border-dashed border-surface-border rounded-2xl p-8 text-center hover:border-brand/30 transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">Click to upload your first portfolio item</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
