@@ -52,7 +52,7 @@ export async function jobIntakeChat(
 
   const completion = await groq.chat.completions.create({
     messages,
-    model: 'mixtral-8x7b-32768',
+    model: 'llama-3.1-8b-instant',
     max_tokens: 500,
     temperature: 0.7,
   })
