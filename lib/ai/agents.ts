@@ -1,7 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 export interface ChatMessage {
   role: 'user' | 'model'
@@ -44,17 +43,21 @@ export async function jobIntakeChat(
   history: ChatMessage[],
   userMessage: string
 ): Promise<{ reply: string; extracted: ExtractedJob | null; isComplete: boolean }> {
-  const chat = model.startChat({
-    history: [
-      { role: 'user', parts: [{ text: JOB_INTAKE_SYSTEM }] },
-      { role: 'model', parts: [{ text: 'Namaste! I am GigMind AI. Tell me what service you need and I will help you find the right professional. Aap Hindi ya English mein bhi baat kar sakte hain!' }] },
-      ...history.map(m => ({ role: m.role, parts: [{ text: m.content }] as [{ text: string }] })),
-    ],
-    generationConfig: { maxOutputTokens: 500 },
+  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+    { role: 'user', content: JOB_INTAKE_SYSTEM },
+    { role: 'assistant', content: 'Namaste! I am GigMind AI. Tell me what service you need and I will help you find the right professional. Aap Hindi ya English mein bhi baat kar sakte hain!' },
+    ...history.map(m => ({ role: m.role === 'model' ? 'assistant' as const : 'user' as const, content: m.content })),
+    { role: 'user', content: userMessage },
+  ]
+
+  const completion = await groq.chat.completions.create({
+    messages,
+    model: 'mixtral-8x7b-32768',
+    max_tokens: 500,
+    temperature: 0.7,
   })
 
-  const result = await chat.sendMessage(userMessage)
-  const fullText = result.response.text()
+  const fullText = completion.choices[0]?.message?.content || ''
 
   let extracted: ExtractedJob | null = null
   let isComplete = false
@@ -86,8 +89,14 @@ Paragraph 1: Introduction + experience
 Paragraph 2: Skills and specializations
 Paragraph 3: Work style + why clients should hire them`
 
-  const result = await model.generateContent(prompt)
-  return result.response.text()
+  const completion = await groq.chat.completions.create({
+    messages: [{ role: 'user', content: prompt }],
+    model: 'mixtral-8x7b-32768',
+    max_tokens: 400,
+    temperature: 0.7,
+  })
+
+  return completion.choices[0]?.message?.content || ''
 }
 
 export async function generateProposal(
@@ -107,8 +116,14 @@ Proposed: ₹${amount}, Timeline: ${timeline}
 Be specific, professional, first person. Show understanding of the job,
 highlight relevant experience, mention the amount naturally, end with clear call to action.`
 
-  const result = await model.generateContent(prompt)
-  return result.response.text()
+  const completion = await groq.chat.completions.create({
+    messages: [{ role: 'user', content: prompt }],
+    model: 'mixtral-8x7b-32768',
+    max_tokens: 300,
+    temperature: 0.7,
+  })
+
+  return completion.choices[0]?.message?.content || ''
 }
 
 export function calculateMatchScore(
