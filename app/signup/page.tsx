@@ -44,7 +44,11 @@ export default function SignupPage() {
       return
     }
 
-    router.push('/dashboard')
+    if (role === 'provider' || role === 'both') {
+      router.push('/settings/provider')
+    } else {
+      router.push('/dashboard')
+    }
     router.refresh()
   }
 

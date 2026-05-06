@@ -6,6 +6,7 @@ import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
 import { Save, Sparkles, ArrowRight, ArrowLeft, CircleCheck as CheckCircle, Upload, MapPin } from 'lucide-react'
+import { toast } from 'sonner'
 
 const CATEGORIES = [
   { slug: 'real-estate', name: 'Real Estate', icon: '🏠' },
@@ -101,6 +102,11 @@ export default function ProviderSettingsPage() {
   }
 
   const generateBio = async () => {
+    if (!aiAnswers.service || !aiAnswers.experience) {
+      toast.error('Please fill in service type and experience')
+      return
+    }
+
     setGenerating(true)
     try {
       const res = await fetch('/api/ai/generate-bio', {
@@ -109,18 +115,42 @@ export default function ProviderSettingsPage() {
         body: JSON.stringify(aiAnswers),
       })
       const data = await res.json()
-      if (data.bio) setBio(data.bio)
-    } catch {
-      // keep existing bio
+      if (data.error) {
+        toast.error(data.error)
+      } else if (data.bio) {
+        setBio(data.bio)
+        toast.success('Bio generated successfully!')
+      }
+    } catch (err) {
+      toast.error('Failed to generate bio')
     }
     setGenerating(false)
   }
 
   const saveProfile = async () => {
+    if (!tagline.trim()) {
+      toast.error('Please enter a tagline')
+      return
+    }
+    if (!bio.trim()) {
+      toast.error('Please enter a bio')
+      return
+    }
+    if (selectedCategories.length === 0) {
+      toast.error('Please select at least one service category')
+      return
+    }
+    if (!city.trim()) {
+      toast.error('Please enter your city')
+      return
+    }
+
     setSaving(true)
     try {
+      let finalProviderId = providerId
+
       if (providerId) {
-        await supabase.from('provider_profiles').update({
+        const { error } = await supabase.from('provider_profiles').update({
           tagline, bio, experience_years: experienceYears, availability,
           languages, rate_hourly: rateHourly ? parseFloat(rateHourly) : null,
           rate_daily: rateDaily ? parseFloat(rateDaily) : null,
@@ -128,8 +158,10 @@ export default function ProviderSettingsPage() {
           rate_project_max: rateProjectMax ? parseFloat(rateProjectMax) : null,
           service_radius_km: serviceRadius,
         }).eq('id', providerId)
+
+        if (error) throw error
       } else {
-        const { data } = await supabase.from('provider_profiles').insert({
+        const { data, error } = await supabase.from('provider_profiles').insert({
           user_id: userId, tagline, bio, experience_years: experienceYears, availability,
           languages, rate_hourly: rateHourly ? parseFloat(rateHourly) : null,
           rate_daily: rateDaily ? parseFloat(rateDaily) : null,
@@ -138,26 +170,36 @@ export default function ProviderSettingsPage() {
           service_radius_km: serviceRadius,
         }).select('id').single()
 
-        if (data) setProviderId(data.id)
+        if (error) throw error
+        if (data) {
+          finalProviderId = data.id
+          setProviderId(data.id)
+        }
       }
 
       // Update categories
-      if (providerId && selectedCategories.length > 0) {
-        const { data: cats } = await supabase.from('categories').select('id, slug').in('slug', selectedCategories)
+      if (finalProviderId && selectedCategories.length > 0) {
+        const { data: cats, error: catError } = await supabase.from('categories').select('id, slug').in('slug', selectedCategories)
+        if (catError) throw catError
+
         if (cats) {
-          await supabase.from('provider_categories').delete().eq('provider_id', providerId)
-          await supabase.from('provider_categories').insert(
-            cats.map(c => ({ provider_id: providerId, category_id: c.id }))
+          await supabase.from('provider_categories').delete().eq('provider_id', finalProviderId)
+          const { error: insertError } = await supabase.from('provider_categories').insert(
+            cats.map(c => ({ provider_id: finalProviderId, category_id: c.id }))
           )
+          if (insertError) throw insertError
         }
       }
 
       // Update city on profile
-      await supabase.from('profiles').update({ city }).eq('id', userId)
+      const { error: profileError } = await supabase.from('profiles').update({ city }).eq('id', userId)
+      if (profileError) throw profileError
 
-      alert('Profile saved successfully!')
+      toast.success('Profile saved successfully!')
+      setTimeout(() => router.push('/dashboard'), 1500)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save profile')
+      const message = err instanceof Error ? err.message : 'Failed to save profile'
+      toast.error(message)
     }
     setSaving(false)
   }
