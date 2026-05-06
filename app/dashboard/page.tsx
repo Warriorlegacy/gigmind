@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
-import { Briefcase, IndianRupee, MessageSquare, Plus, TrendingUp, Star, ArrowRight, Clock, Users, Sparkles, Crown } from 'lucide-react'
+import { Briefcase, IndianRupee, MessageSquare, Plus, TrendingUp, Star, ArrowRight, Clock, Users, Sparkles, Crown, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Profile {
   id: string
@@ -44,6 +45,8 @@ export default function DashboardPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [isProvider, setIsProvider] = useState(false)
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -85,6 +88,25 @@ export default function DashboardPage() {
 
     setConversations(convData || [])
     setLoading(false)
+  }
+
+  const handleCancelJob = async (jobId: string) => {
+    setDeletingJobId(jobId)
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'cancelled' })
+        .eq('id', jobId)
+
+      if (error) throw error
+
+      setJobs(jobs.filter(j => j.id !== jobId))
+      toast.success('Job cancelled successfully')
+      setShowDeleteConfirm(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel job')
+    }
+    setDeletingJobId(null)
   }
 
   if (loading) {
@@ -253,19 +275,31 @@ export default function DashboardPage() {
               {jobs.length > 0 ? (
                 <div className="space-y-3">
                   {jobs.map((job) => (
-                    <Link key={job.id} href={`/jobs/${job.id}`} className="block p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-white text-sm truncate">{job.title}</span>
-                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                          job.status === 'open' ? 'bg-success-bg text-success' : 'bg-info-bg text-info'
-                        }`}>{job.status.replace(/_/g, ' ')}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
-                        {job.city && <span>{job.city}</span>}
-                        <span>{job.applications_count} applications</span>
-                      </div>
-                    </Link>
+                    <div key={job.id} className="p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors group flex items-start justify-between">
+                      <Link href={`/jobs/${job.id}`} className="flex-1 block">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-white text-sm truncate">{job.title}</span>
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                            job.status === 'open' ? 'bg-success-bg text-success' : 'bg-info-bg text-info'
+                          }`}>{job.status.replace(/_/g, ' ')}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
+                          {job.city && <span>{job.city}</span>}
+                          <span>{job.applications_count} applications</span>
+                        </div>
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setShowDeleteConfirm(job.id)
+                        }}
+                        className="ml-2 p-1.5 rounded-lg bg-error/10 text-error opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/20"
+                        title="Cancel job"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -307,6 +341,32 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowDeleteConfirm(null)}>
+          <div className="w-full max-w-sm bg-surface-card rounded-2xl border border-surface-border p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-display text-xl font-bold text-white mb-2">Cancel This Job?</h2>
+            <p className="text-muted-foreground text-sm mb-6">Are you sure you want to cancel this job? This action cannot be undone.</p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 py-3 rounded-xl border border-surface-border text-muted-foreground hover:text-white transition-colors text-sm"
+              >
+                Keep Job
+              </button>
+              <button
+                onClick={() => handleCancelJob(showDeleteConfirm)}
+                disabled={deletingJobId === showDeleteConfirm}
+                className="flex-1 py-3 rounded-xl bg-error/10 text-error hover:bg-error/20 transition-colors font-medium text-sm disabled:opacity-50"
+              >
+                {deletingJobId === showDeleteConfirm ? 'Cancelling...' : 'Cancel Job'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

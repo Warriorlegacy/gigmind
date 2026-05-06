@@ -31,6 +31,7 @@ export default function AIChatPage() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [sessionId, setSessionId] = useState<string>('')
   const [posting, setPosting] = useState(false)
+  const [jobPosted, setJobPosted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -91,9 +92,10 @@ export default function AIChatPage() {
       return
     }
 
-    if (!extracted) return
+    if (!extracted || jobPosted) return
 
     setPosting(true)
+    setJobPosted(true)
     try {
       const { data: category } = await supabase
         .from('categories')
@@ -103,6 +105,7 @@ export default function AIChatPage() {
 
       if (!category) {
         toast.error('Category not found')
+        setJobPosted(false)
         return
       }
 
@@ -129,6 +132,7 @@ export default function AIChatPage() {
 
       if (error) {
         toast.error(`Failed to post job: ${error.message}`)
+        setJobPosted(false)
         return
       }
 
@@ -139,6 +143,7 @@ export default function AIChatPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to post job'
       toast.error(message)
+      setJobPosted(false)
     } finally {
       setPosting(false)
     }
@@ -328,10 +333,10 @@ export default function AIChatPage() {
 
                   <button
                     onClick={handlePostJob}
-                    disabled={posting}
+                    disabled={posting || jobPosted}
                     className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
                   >
-                    {posting ? 'Posting...' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
+                    {posting ? <>Posting... <Sparkles className="w-4 h-4 animate-spin" /></> : jobPosted ? 'Job Posted!' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
                   </button>
 
                   {!user && (
@@ -379,10 +384,10 @@ export default function AIChatPage() {
                     </div>
                     <button
                       onClick={handlePostJob}
-                      disabled={posting}
+                      disabled={posting || jobPosted}
                       className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
                     >
-                      {posting ? 'Posting...' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
+                      {posting ? <>Posting... <Sparkles className="w-4 h-4 animate-spin" /></> : jobPosted ? 'Job Posted!' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
                     </button>
                   </div>
                 </div>

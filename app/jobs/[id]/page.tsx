@@ -6,7 +6,8 @@ import Link from 'next/link'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
-import { MapPin, IndianRupee, Clock, Users, ArrowLeft, Send, Sparkles, Star, Calendar, CircleCheck as CheckCircle } from 'lucide-react'
+import { MapPin, IndianRupee, Clock, Users, ArrowLeft, Send, Sparkles, Star, Calendar, CircleCheck as CheckCircle, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Job {
   id: string
@@ -34,11 +35,13 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [showApplyModal, setShowApplyModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [coverLetter, setCoverLetter] = useState('')
   const [proposedAmount, setProposedAmount] = useState('')
   const [proposedTimeline, setProposedTimeline] = useState('')
   const [generatingAI, setGeneratingAI] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [hasProviderProfile, setHasProviderProfile] = useState(false)
   const supabase = createClient()
@@ -135,12 +138,32 @@ export default function JobDetailPage() {
       }).eq('id', id)
 
       setShowApplyModal(false)
-      alert('Application submitted successfully!')
+      toast.success('Application submitted successfully!')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to submit application')
+      toast.error(err instanceof Error ? err.message : 'Failed to submit application')
     }
     setSubmitting(false)
   }
+
+  const handleDeleteJob = async () => {
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'cancelled' })
+        .eq('id', id)
+
+      if (error) throw error
+
+      toast.success('Job cancelled successfully')
+      setTimeout(() => router.push('/dashboard'), 1500)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel job')
+      setDeleting(false)
+    }
+  }
+
+  const isJobOwner = user && job && job.profiles?.id === user.id
 
   if (loading) {
     return (
@@ -197,7 +220,18 @@ export default function JobDetailPage() {
                   </span>
                 </div>
 
-                <h1 className="font-display text-2xl sm:text-3xl font-bold text-white mb-4">{job.title}</h1>
+                <div className="flex items-start justify-between mb-4">
+                  <h1 className="font-display text-2xl sm:text-3xl font-bold text-white">{job.title}</h1>
+                  {isJobOwner && (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="p-2.5 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
+                      title="Cancel this job"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
 
                 <div className="flex flex-wrap gap-4 mb-6 text-sm text-muted-foreground">
                   {job.city && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-brand" /> {job.city}</span>}
@@ -329,6 +363,32 @@ export default function JobDetailPage() {
                   {submitting ? 'Submitting...' : <><CheckCircle className="w-4 h-4" /> Submit Application</>}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="w-full max-w-sm bg-surface-card rounded-2xl border border-surface-border p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-display text-xl font-bold text-white mb-2">Cancel This Job?</h2>
+            <p className="text-muted-foreground text-sm mb-6">Are you sure you want to cancel this job? This action cannot be undone.</p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-3 rounded-xl border border-surface-border text-muted-foreground hover:text-white transition-colors text-sm"
+              >
+                Keep Job
+              </button>
+              <button
+                onClick={handleDeleteJob}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl bg-error/10 text-error hover:bg-error/20 transition-colors font-medium text-sm disabled:opacity-50"
+              >
+                {deleting ? 'Cancelling...' : 'Cancel Job'}
+              </button>
             </div>
           </div>
         </div>
