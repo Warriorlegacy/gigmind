@@ -6,7 +6,10 @@ import Link from 'next/link'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
-import { MapPin, IndianRupee, Clock, Users, ArrowLeft, Send, Sparkles, Star, Calendar, CircleCheck as CheckCircle, Trash2 } from 'lucide-react'
+import {
+  MapPin, IndianRupee, Clock, Users, ArrowLeft, Send, Sparkles,
+  Star, Calendar, CircleCheck as CheckCircle, Trash2, BadgeCheck,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Job {
@@ -25,6 +28,7 @@ interface Job {
   applications_count: number
   views_count: number
   created_at: string
+  hirer_id: string
   categories: { id: string; name: string; slug: string; icon: string } | null
   profiles: { id: string; full_name: string; avatar_url: string | null; created_at: string } | null
 }
@@ -44,6 +48,7 @@ export default function JobDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [hasProviderProfile, setHasProviderProfile] = useState(false)
+  const [alreadyApplied, setAlreadyApplied] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -75,6 +80,16 @@ export default function JobDetailPage() {
         .eq('user_id', user.id)
         .maybeSingle()
       setHasProviderProfile(!!provider)
+
+      if (provider) {
+        const { data: existing } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('job_id', id)
+          .eq('provider_id', provider.id)
+          .maybeSingle()
+        setAlreadyApplied(!!existing)
+      }
     }
   }
 
@@ -103,16 +118,22 @@ export default function JobDetailPage() {
       const data = await res.json()
       if (data.proposal) setCoverLetter(data.proposal)
     } catch {
-      // fallback: keep existing cover letter
+      toast.error('AI generation failed, please write manually.')
     }
     setGeneratingAI(false)
   }
 
   const handleApply = async () => {
-    if (!user || !hasProviderProfile) {
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    if (!hasProviderProfile) {
       router.push('/signup?role=provider')
       return
     }
+    if (alreadyApplied) return
+
     setSubmitting(true)
     try {
       const { data: provider } = await supabase
@@ -129,18 +150,41 @@ export default function JobDetailPage() {
         cover_letter: coverLetter,
         proposed_amount: proposedAmount ? parseFloat(proposedAmount) : null,
         proposed_timeline: proposedTimeline,
+        status: 'pending',
       })
 
       if (error) throw error
 
+      // Increment applications_count
       await supabase.from('jobs').update({
         applications_count: (job?.applications_count || 0) + 1,
       }).eq('id', id)
 
+      // Notify hirer via server API (service role bypasses client RLS)
+      if (job?.hirer_id) {
+        fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: job.hirer_id,
+            type: 'new_application',
+            title: 'New application received',
+            body: `Someone applied to your job: ${job.title}`,
+            data: { job_id: id },
+          }),
+        }).catch(() => {}) // fire-and-forget
+      }
+
+      setAlreadyApplied(true)
       setShowApplyModal(false)
-      toast.success('Application submitted successfully!')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to submit application')
+      toast.success('Application submitted!')
+    } catch (err: any) {
+      if (err?.code === '23505') {
+        toast.error('You have already applied to this job.')
+        setAlreadyApplied(true)
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Failed to submit application')
+      }
     }
     setSubmitting(false)
   }
@@ -164,6 +208,11 @@ export default function JobDetailPage() {
   }
 
   const isJobOwner = user && job && job.profiles?.id === user.id
+
+  // Show Apply button only to providers who are NOT the owner
+  const canApply = user && hasProviderProfile && !isJobOwner
+  const showApplyButton = canApply || !user // also show if not logged in (redirect to /login)
+  const applyVisible = !isJobOwner
 
   if (loading) {
     return (
@@ -268,19 +317,46 @@ export default function JobDetailPage() {
                   <h3 className="font-display font-bold text-white text-sm mb-4">Posted By</h3>
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center">
-                      <span className="text-brand font-bold text-sm">{job.profiles.full_name?.charAt(0) || '?'}</span>
+                      {job.profiles.avatar_url ? (
+                        <img src={job.profiles.avatar_url} alt={job.profiles.full_name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <span className="text-brand font-bold text-sm">{job.profiles.full_name?.charAt(0) || '?'}</span>
+                      )}
                     </div>
                     <div>
                       <div className="font-medium text-white text-sm">{job.profiles.full_name}</div>
                       <div className="text-xs text-muted-foreground">Member since {formatRelativeTime(job.profiles.created_at)}</div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowApplyModal(true)}
-                    className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                  >
-                    <Send className="w-4 h-4" /> Apply Now
-                  </button>
+
+                  {/* Apply / Already Applied / Owner view */}
+                  {isJobOwner ? (
+                    <Link
+                      href={`/jobs/${id}/applications`}
+                      className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm"
+                    >
+                      <Users className="w-4 h-4" /> View Applications
+                      {job.applications_count > 0 && (
+                        <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold">
+                          {job.applications_count}
+                        </span>
+                      )}
+                    </Link>
+                  ) : alreadyApplied ? (
+                    <div className="w-full py-3 rounded-xl bg-success-bg text-success font-medium flex items-center justify-center gap-2 text-sm">
+                      <BadgeCheck className="w-4 h-4" /> Already Applied
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (!user) { router.push('/login'); return }
+                        setShowApplyModal(true)
+                      }}
+                      className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-4 h-4" /> Apply Now
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -302,7 +378,8 @@ export default function JobDetailPage() {
       {showApplyModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowApplyModal(false)}>
           <div className="w-full max-w-lg bg-surface-card rounded-2xl border border-surface-border p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-display text-xl font-bold text-white mb-6">Apply for This Job</h2>
+            <h2 className="font-display text-xl font-bold text-white mb-1">Apply for This Job</h2>
+            <p className="text-muted-foreground text-sm mb-6">{job.title}</p>
 
             <div className="space-y-4">
               <div>
@@ -320,7 +397,7 @@ export default function JobDetailPage() {
                     disabled={generatingAI}
                     className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-brand/10 text-brand text-xs font-medium hover:bg-brand/20 transition-colors flex items-center gap-1 disabled:opacity-50"
                   >
-                    <Sparkles className="w-3 h-3" /> {generatingAI ? 'Generating...' : 'AI Generate'}
+                    <Sparkles className="w-3 h-3" /> {generatingAI ? 'Generating...' : 'Generate with AI'}
                   </button>
                 </div>
               </div>
