@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Menu, X, Bell, User, LogOut } from 'lucide-react'
+import { Menu, X, Bell, User as UserIcon, LogOut } from 'lucide-react'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 import Logo from './Logo'
 
 export default function Navigation() {
@@ -48,7 +49,7 @@ export default function Navigation() {
                     className="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-card transition-colors"
                   >
                     <div className="w-8 h-8 rounded-full bg-brand-gradient flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
+                      <UserIcon className="w-4 h-4 text-white" />
                     </div>
                   </button>
                   {profileMenuOpen && (
