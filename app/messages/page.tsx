@@ -21,7 +21,7 @@ interface Conversation {
   provider_unread: number
   jobs: { title: string; status: string } | null
   hirer_profile: { full_name: string; avatar_url: string | null } | null
-  provider_profile: { full_name: string; avatar_url: string | null } | null
+  provider_profile: { user_id?: string; full_name: string; avatar_url: string | null } | null
 }
 
 interface Message {
@@ -78,7 +78,7 @@ export default function MessagesPage() {
     const convData = (data || []).map((c: any) => ({
       ...c,
       hirer_profile: c.hirer_id === user.id ? null : c.profiles,
-      provider_profile: c.provider_id === user.id ? null : c.provider_profile?.profiles,
+      provider_profile: c.provider_id === user.id ? null : { ...c.provider_profile?.profiles, user_id: c.provider_profile?.user_id },
     })) as Conversation[]
 
     setConversations(convData)
