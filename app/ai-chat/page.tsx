@@ -8,7 +8,20 @@ import { formatINR } from '@/lib/utils/formatting'
 import { Send, Bot, User, MapPin, Briefcase, IndianRupee, Clock, X, ArrowRight, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ExtractedJob } from '@/lib/ai/agents'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 import Logo from '@/components/shared/Logo'
+
+interface Message {
+  id: string
+  role: 'user' | 'model'
+  content: string
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  'real-estate': '🏠', 'medical': '🏥', 'home-repair': '🔧', 'office-assistance': '🏢',
+  'interior-design': '🎨', 'security': '🔐', 'human-resources': '👥', 'cleaning': '🧹',
+  'transport': '🚚', 'education': '📚', 'event-management': '🎉', 'it-services': '💻',
+}
 
 export default function AIChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
