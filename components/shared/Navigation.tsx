@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Menu, X, Bell, User, LogOut } from 'lucide-react'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
+import Logo from './Logo'
 
 export default function Navigation() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
@@ -31,12 +31,7 @@ export default function Navigation() {
     <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-surface-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brand-gradient flex items-center justify-center">
-              <span className="text-white font-display font-bold text-sm">G</span>
-            </div>
-            <span className="font-display font-bold text-xl text-white">GigMind</span>
-          </Link>
+          <Logo size="sm" />
 
           <div className="hidden md:flex items-center gap-6">
             <Link href="/jobs" className="text-sm text-muted-foreground hover:text-white transition-colors">Browse Jobs</Link>

@@ -8,19 +8,7 @@ import { formatINR } from '@/lib/utils/formatting'
 import { Send, Bot, User, MapPin, Briefcase, IndianRupee, Clock, X, ArrowRight, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ExtractedJob } from '@/lib/ai/agents'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
-
-interface Message {
-  id: string
-  role: 'user' | 'model'
-  content: string
-}
-
-const CATEGORY_ICONS: Record<string, string> = {
-  'real-estate': '🏠', 'medical': '🏥', 'home-repair': '🔧', 'office-assistance': '🏢',
-  'interior-design': '🎨', 'security': '🔐', 'human-resources': '👥', 'cleaning': '🧹',
-  'transport': '🚚', 'education': '📚', 'event-management': '🎉', 'it-services': '💻',
-}
+import Logo from '@/components/shared/Logo'
 
 export default function AIChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -183,12 +171,8 @@ export default function AIChatPage() {
       <header className="flex-shrink-0 border-b border-surface-border glass">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-brand-gradient flex items-center justify-center">
-                <span className="text-white font-display font-bold text-sm">G</span>
-              </div>
-              <span className="font-display font-bold text-lg text-white hidden sm:block">GigMind AI</span>
-            </Link>
+            <Logo size="sm" showText={false} />
+            <span className="font-display font-bold text-lg text-white hidden sm:block">GigMind AI</span>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
               <Sparkles className="w-3 h-3" /> AI Assistant
             </div>

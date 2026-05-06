@@ -95,6 +95,13 @@ export default function DashboardPage() {
 
     setJobs((jobData || []) as Job[])
 
+    const { data: convData } = await supabase
+      .from('conversations')
+      .select('*, profiles!conversations_provider_id_fkey(full_name), profiles!conversations_hirer_id_fkey(full_name)')
+      .or(`hirer_id.eq.${user.id},provider_id.eq.${user.id}`)
+      .order('last_message_at', { ascending: false })
+      .limit(5)
+
     setConversations(convData || [])
 
     // Persona specific data

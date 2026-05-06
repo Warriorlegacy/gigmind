@@ -56,6 +56,8 @@ const STEPS = [
   },
 ]
 
+import Logo from '@/components/shared/Logo'
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-surface">
@@ -202,11 +204,8 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-brand-gradient flex items-center justify-center">
-                  <span className="text-white font-display font-bold text-xs">G</span>
-                </div>
-                <span className="font-display font-bold text-lg text-white">GigMind</span>
+              <div className="mb-4">
+                <Logo size="sm" />
               </div>
               <p className="text-sm text-muted-foreground">AI-powered service marketplace for India.</p>
             </div>
