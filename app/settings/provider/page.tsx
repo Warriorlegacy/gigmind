@@ -109,6 +109,14 @@ export default function ProviderSettingsPage() {
       setServiceRadius(provider.service_radius_km || 20)
       setSelectedCategories(provider.provider_categories?.map((pc: any) => pc.categories?.slug).filter(Boolean) || [])
       
+      // Pre-fill AI answers with existing data to make generation easier
+      setAiAnswers(prev => ({
+        ...prev,
+        service: provider.tagline || '',
+        experience: provider.experience_years?.toString() || '',
+        skills: provider.skills || '', // assuming there's a skills field, let's check
+      }))
+      
       // Load portfolio items
       const { data: items } = await supabase
         .from('portfolio_items')
@@ -128,6 +136,7 @@ export default function ProviderSettingsPage() {
       return
     }
 
+    console.log('Starting bio generation with:', aiAnswers)
     setGenerating(true)
     try {
       const res = await fetch('/api/ai/generate-bio', {
@@ -135,15 +144,26 @@ export default function ProviderSettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aiAnswers),
       })
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `Server returned ${res.status}`)
+      }
+
       const data = await res.json()
+      console.log('AI Bio Response:', data)
+      
       if (data.error) {
         toast.error(data.error)
       } else if (data.bio) {
         setBio(data.bio)
         toast.success('Bio generated successfully!')
+      } else {
+        toast.error('AI returned an empty response. Please try again.')
       }
     } catch (err) {
-      toast.error('Failed to generate bio')
+      console.error('Bio Generation Error:', err)
+      toast.error(err instanceof Error ? err.message : 'Failed to generate bio')
     }
     setGenerating(false)
   }
@@ -497,9 +517,10 @@ export default function ProviderSettingsPage() {
                 <button
                   onClick={generateBio}
                   disabled={generating}
-                  className="w-full py-3 rounded-xl bg-brand/10 text-brand font-medium hover:bg-brand/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-3 rounded-xl bg-brand text-white font-semibold hover:bg-brand-dark transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-brand/20 active:scale-[0.98]"
                 >
-                  <Sparkles className="w-4 h-4" /> {generating ? 'Generating...' : 'Generate Bio with AI'}
+                  <Sparkles className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} /> 
+                  {generating ? 'AI is crafting your bio...' : 'Generate Premium Bio with AI'}
                 </button>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Bio (editable)</label>
