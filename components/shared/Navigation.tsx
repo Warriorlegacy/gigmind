@@ -5,43 +5,20 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Menu, X, Bell, User, LogOut } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
-import { GigMindLogo } from '@/components/shared/Logo'
 
 export default function Navigation() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0)
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
-      if (user) fetchUnread(user.id)
-    })
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) fetchUnread(session.user.id)
-      else setUnreadCount(0)
     })
     return () => subscription.unsubscribe()
   }, [])
-
-  const fetchUnread = async (userId: string) => {
-    const { count } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_read', false)
-    setUnreadCount(count || 0)
-  }
-
-  // Re-poll every 30 seconds for new notifications
-  useEffect(() => {
-    if (!user) return
-    const interval = setInterval(() => fetchUnread(user.id), 30_000)
-    return () => clearInterval(interval)
-  }, [user])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -54,8 +31,11 @@ export default function Navigation() {
     <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-surface-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-0">
-            <GigMindLogo size={36} />
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-brand-gradient flex items-center justify-center">
+              <span className="text-white font-display font-bold text-sm">G</span>
+            </div>
+            <span className="font-display font-bold text-xl text-white">GigMind</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
@@ -64,18 +44,8 @@ export default function Navigation() {
             <Link href="/ai-chat" className="text-sm text-muted-foreground hover:text-white transition-colors">AI Chat</Link>
             {user ? (
               <div className="flex items-center gap-3">
-                {/* Notification Bell */}
-                <Link
-                  href="/dashboard"
-                  className="relative p-2 rounded-lg hover:bg-surface-card transition-colors"
-                  title="Notifications"
-                >
+                <Link href="/messages" className="relative p-2 rounded-lg hover:bg-surface-card transition-colors">
                   <Bell className="w-5 h-5 text-muted-foreground" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
                 </Link>
                 <div className="relative">
                   <button
@@ -119,9 +89,7 @@ export default function Navigation() {
             <Link href="/ai-chat" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>AI Chat</Link>
             {user ? (
               <>
-                <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>
-                  Dashboard {unreadCount > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-brand text-white text-[10px] font-bold">{unreadCount}</span>}
-                </Link>
+                <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>Dashboard</Link>
                 <Link href="/messages" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>Messages</Link>
                 <button onClick={handleLogout} className="text-sm text-error">Sign Out</button>
               </>

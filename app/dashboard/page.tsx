@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
-import { Briefcase, IndianRupee, MessageSquare, Plus, TrendingUp, Star, ArrowRight, Clock, Users, Sparkles, Crown, Trash2, FileText } from 'lucide-react'
+import { Briefcase, IndianRupee, MessageSquare, Plus, TrendingUp, Star, ArrowRight, Clock, Users, Sparkles, Crown, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Profile {
@@ -286,24 +286,15 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
                           {job.city && <span>{job.city}</span>}
+                          <span>{job.applications_count} applications</span>
                         </div>
-                      </Link>
-                      {/* Applications badge linking to /jobs/[id]/applications */}
-                      <Link
-                        href={`/jobs/${job.id}/applications`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mx-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 transition-colors text-xs font-medium flex-shrink-0"
-                        title="View applications"
-                      >
-                        <FileText className="w-3 h-3" />
-                        {job.applications_count}
                       </Link>
                       <button
                         onClick={(e) => {
                           e.preventDefault()
                           setShowDeleteConfirm(job.id)
                         }}
-                        className="p-1.5 rounded-lg bg-error/10 text-error opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/20"
+                        className="ml-2 p-1.5 rounded-lg bg-error/10 text-error opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/20"
                         title="Cancel job"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

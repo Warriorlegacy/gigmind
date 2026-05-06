@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react'
-import { GigMindLogo } from '@/components/shared/Logo'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -35,8 +34,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-0 mb-6">
-            <GigMindLogo size={44} />
+          <Link href="/" className="inline-flex items-center gap-2 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-brand-gradient flex items-center justify-center">
+              <span className="text-white font-display font-bold">G</span>
+            </div>
+            <span className="font-display font-bold text-2xl text-white">GigMind</span>
           </Link>
           <h1 className="font-display text-2xl font-bold text-white mb-2">Welcome Back</h1>
           <p className="text-muted-foreground text-sm">Sign in to your account</p>
