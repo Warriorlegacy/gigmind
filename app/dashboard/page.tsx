@@ -88,6 +88,40 @@ export default function DashboardPage() {
 
     setConversations(convData || [])
     setLoading(false)
+
+    // Check for pending job from AI chat
+    const pendingJobStr = localStorage.getItem('gigmind_pending_job')
+    if (pendingJobStr) {
+      try {
+        const pendingJob = JSON.parse(pendingJobStr)
+        toast(
+          <div className="flex flex-col gap-2 p-1">
+            <p className="font-medium text-white">You have a pending job draft:</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">"{pendingJob.title}"</p>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => router.push('/ai-chat')}
+                className="px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-medium"
+              >
+                View & Post
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('gigmind_pending_job')
+                  toast.dismiss()
+                }}
+                className="px-3 py-1.5 rounded-lg bg-surface-hover text-muted-foreground text-xs font-medium"
+              >
+                Discard
+              </button>
+            </div>
+          </div>,
+          { duration: 10000 }
+        )
+      } catch (e) {
+        localStorage.removeItem('gigmind_pending_job')
+      }
+    }
   }
 
   const handleCancelJob = async (jobId: string) => {
