@@ -39,9 +39,25 @@ interface Conversation {
   profiles: { full_name: string } | null
 }
 
+interface Application {
+  id: string
+  job_id: string
+  status: string
+  created_at: string
+  jobs: {
+    title: string
+    status: string
+    budget_min: number | null
+    budget_max: number | null
+    categories: { name: string; icon: string } | null
+  } | null
+}
+
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
+  const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [isProvider, setIsProvider] = useState(false)
@@ -79,14 +95,45 @@ export default function DashboardPage() {
 
     setJobs((jobData || []) as Job[])
 
-    const { data: convData } = await supabase
-      .from('conversations')
-      .select('*, profiles!conversations_provider_id_fkey(full_name), profiles!conversations_hirer_id_fkey(full_name)')
-      .or(`hirer_id.eq.${user.id},provider_id.eq.${user.id}`)
-      .order('last_message_at', { ascending: false })
-      .limit(5)
-
     setConversations(convData || [])
+
+    // Persona specific data
+    if (prof.role === 'provider' || prof.role === 'both') {
+      // 1. Fetch Provider Profile ID
+      const { data: provProfile } = await supabase
+        .from('provider_profiles')
+        .select('id, provider_categories(category_id)')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (provProfile) {
+        // 2. Fetch Sent Applications
+        const { data: apps } = await supabase
+          .from('applications')
+          .select('*, jobs(title, status, budget_min, budget_max, categories(name, icon))')
+          .eq('provider_id', provProfile.id)
+          .order('created_at', { ascending: false })
+          .limit(5)
+        
+        setApplications(apps || [])
+
+        // 3. Fetch Recommended Jobs (based on categories)
+        const catIds = provProfile.provider_categories?.map(pc => pc.category_id) || []
+        if (catIds.length > 0) {
+          const { data: recJobs } = await supabase
+            .from('jobs')
+            .select('*, categories(name, icon)')
+            .in('category_id', catIds)
+            .eq('status', 'open')
+            .neq('hirer_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(5)
+          
+          setRecommendedJobs(recJobs || [])
+        }
+      }
+    }
+
     setLoading(false)
 
     // Check for pending job from AI chat
@@ -221,14 +268,14 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
-                <div className="p-5 rounded-2xl bg-surface-card border border-surface-border">
+                 <div className="p-5 rounded-2xl bg-surface-card border border-surface-border">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-10 h-10 rounded-xl bg-info-bg flex items-center justify-center">
                       <TrendingUp className="w-5 h-5 text-info" />
                     </div>
                     <div>
-                      <div className="font-display font-bold text-white text-xl">0</div>
-                      <div className="text-xs text-muted-foreground">This Month</div>
+                      <div className="font-display font-bold text-white text-xl">{applications.length}</div>
+                      <div className="text-xs text-muted-foreground">Applications</div>
                     </div>
                   </div>
                 </div>
@@ -300,55 +347,125 @@ export default function DashboardPage() {
           )}
 
           <div className="grid lg:grid-cols-2 gap-6">
-            {/* Active Jobs */}
-            <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display font-bold text-white">Active Jobs</h2>
-                <Link href="/jobs" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
-              </div>
-              {jobs.length > 0 ? (
-                <div className="space-y-3">
-                  {jobs.map((job) => (
-                    <div key={job.id} className="p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors group flex items-start justify-between">
-                      <Link href={`/jobs/${job.id}`} className="flex-1 block">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-white text-sm truncate">{job.title}</span>
-                          <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                            job.status === 'open' ? 'bg-success-bg text-success' : 'bg-info-bg text-info'
-                          }`}>{job.status.replace(/_/g, ' ')}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
-                          {job.city && <span>{job.city}</span>}
-                          <span>{job.applications_count} applications</span>
-                        </div>
-                      </Link>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setShowDeleteConfirm(job.id)
-                        }}
-                        className="ml-2 p-1.5 rounded-lg bg-error/10 text-error opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/20"
-                        title="Cancel job"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+            {/* Persona Specific Main Section */}
+            {isProvider ? (
+              <div className="space-y-6">
+                {/* My Applications */}
+                <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-bold text-white">My Applications</h2>
+                    <Link href="/dashboard/applications" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
+                  </div>
+                  {applications.length > 0 ? (
+                    <div className="space-y-3">
+                      {applications.map((app) => (
+                        <Link key={app.id} href={`/jobs/${app.job_id}`} className="block p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-white text-sm truncate">{app.jobs?.title}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                              app.status === 'hired' ? 'bg-success-bg text-success' :
+                              app.status === 'shortlisted' ? 'bg-info-bg text-info' :
+                              app.status === 'rejected' ? 'bg-error-bg text-error' :
+                              'bg-surface-hover text-muted-foreground'
+                            }`}>{app.status}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                            {app.jobs?.categories && <span>{app.jobs.categories.icon} {app.jobs.categories.name}</span>}
+                            <span>Applied {formatRelativeTime(app.created_at)}</span>
+                          </div>
+                        </Link>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground text-sm mb-3">You haven't applied to any jobs yet</p>
+                      <Link href="/jobs" className="text-brand text-sm font-medium hover:underline">Browse Jobs</Link>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Briefcase className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm mb-3">No active jobs yet</p>
-                  <Link href="/ai-chat" className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium inline-flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> Post with AI
-                  </Link>
-                </div>
-              )}
-            </div>
 
-            {/* Recent Messages */}
-            <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
+                {/* Recommended Jobs */}
+                <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-bold text-white">Recommended Jobs</h2>
+                    <Link href="/jobs" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">Browse More <ArrowRight className="w-3 h-3" /></Link>
+                  </div>
+                  {recommendedJobs.length > 0 ? (
+                    <div className="space-y-3">
+                      {recommendedJobs.map((job) => (
+                        <Link key={job.id} href={`/jobs/${job.id}`} className="block p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-white text-sm truncate">{job.title}</span>
+                            <span className="text-xs text-brand font-bold">{job.budget_max ? formatINR(job.budget_max) : 'Negotiable'}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                            {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
+                            <span>{job.city}</span>
+                            <span>{job.applications_count} applicants</span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground text-sm">No specific recommendations yet</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Hirer View: Active Jobs */
+              <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-display font-bold text-white">My Active Jobs</h2>
+                  <Link href="/jobs" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
+                </div>
+                {jobs.length > 0 ? (
+                  <div className="space-y-3">
+                    {jobs.map((job) => (
+                      <div key={job.id} className="p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors group flex items-start justify-between">
+                        <Link href={`/jobs/${job.id}`} className="flex-1 block">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-white text-sm truncate">{job.title}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                              job.status === 'open' ? 'bg-success-bg text-success' : 'bg-info-bg text-info'
+                            }`}>{job.status.replace(/_/g, ' ')}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                            {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
+                            {job.city && <span>{job.city}</span>}
+                            <span>{job.applications_count} applications</span>
+                          </div>
+                        </Link>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            setShowDeleteConfirm(job.id)
+                          }}
+                          className="ml-2 p-1.5 rounded-lg bg-error/10 text-error opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/20"
+                          title="Cancel job"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Briefcase className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground text-sm mb-3">No active jobs yet</p>
+                    <Link href="/ai-chat" className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium inline-flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Post with AI
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Common Section: Recent Messages */}
+            <div className="p-6 rounded-2xl bg-surface-card border border-surface-border self-start">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-display font-bold text-white">Recent Messages</h2>
                 <Link href="/messages" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>

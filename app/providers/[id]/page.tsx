@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
-import { MapPin, Star, Shield, Clock, Briefcase, MessageSquare, IndianRupee, Calendar, Globe, ArrowLeft, CircleCheck as CheckCircle } from 'lucide-react'
+import { MapPin, Star, Shield, Clock, Briefcase, MessageSquare, IndianRupee, Calendar, Globe, ArrowLeft, CircleCheck as CheckCircle, FileText, ExternalLink, X } from 'lucide-react'
 
 interface Provider {
   id: string
@@ -45,6 +45,7 @@ export default function ProviderProfilePage() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'about' | 'portfolio' | 'reviews'>('about')
+  const [selectedItem, setSelectedItem] = useState<{ url: string; type: string; title: string } | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -205,16 +206,27 @@ export default function ProviderProfilePage() {
               {activeTab === 'portfolio' && (
                 <div className="animate-fade-in">
                   {provider.portfolio_items?.length ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                       {provider.portfolio_items.map((item) => (
-                        <div key={item.id} className="aspect-square rounded-xl bg-surface-card border border-surface-border overflow-hidden group">
-                          {item.media_url ? (
+                        <div 
+                          key={item.id} 
+                          onClick={() => setSelectedItem({ url: item.media_url, type: item.media_type, title: item.title })}
+                          className="aspect-square rounded-xl bg-surface-card border border-surface-border overflow-hidden group cursor-pointer relative"
+                        >
+                          {item.media_type === 'image' ? (
                             <img src={item.media_url} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                              <Briefcase className="w-8 h-8" />
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center">
+                              <FileText className="w-10 h-10 text-brand" />
+                              <span className="text-xs text-muted-foreground font-medium truncate w-full">{item.title}</span>
+                              <span className="text-[10px] uppercase tracking-wider text-brand font-bold bg-brand/10 px-2 py-0.5 rounded">PDF</span>
                             </div>
                           )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
+                              <ExternalLink className="w-5 h-5" />
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -300,6 +312,44 @@ export default function ProviderProfilePage() {
           </div>
         </div>
       </main>
+
+      {/* Lightbox Modal */}
+      {selectedItem && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
+          onClick={() => setSelectedItem(null)}
+        >
+          <button 
+            onClick={() => setSelectedItem(null)}
+            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="max-w-5xl w-full max-h-full relative flex flex-col items-center gap-4" onClick={e => e.stopPropagation()}>
+            <div className="w-full rounded-2xl overflow-hidden bg-surface-card border border-surface-border shadow-2xl flex items-center justify-center min-h-[300px]">
+              {selectedItem.type === 'image' ? (
+                <img src={selectedItem.url} alt={selectedItem.title} className="max-w-full max-h-[80vh] object-contain" />
+              ) : (
+                <div className="w-full h-[80vh] flex flex-col">
+                  <iframe src={selectedItem.url} className="flex-1 w-full border-none" title={selectedItem.title} />
+                </div>
+              )}
+            </div>
+            <div className="text-center">
+              <h3 className="text-white font-medium">{selectedItem.title}</h3>
+              <a 
+                href={selectedItem.url} 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-brand text-sm hover:underline mt-1 inline-flex items-center gap-1"
+              >
+                Open original file <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

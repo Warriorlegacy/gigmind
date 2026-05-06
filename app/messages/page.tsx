@@ -6,8 +6,9 @@ import Link from 'next/link'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatRelativeTime } from '@/lib/utils/formatting'
-import { Send, ArrowLeft, Sparkles, Bot, User, CircleCheck as CheckCircle, MessageSquare } from 'lucide-react'
+import { Send, ArrowLeft, Sparkles, Bot, User, CircleCheck as CheckCircle, MessageSquare, Trash2 } from 'lucide-react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { toast } from 'sonner'
 
 interface Conversation {
   id: string
@@ -55,6 +56,7 @@ export default function MessagesPage() {
     if (activeConv) {
       loadMessages(activeConv.id)
       subscribeToMessages(activeConv.id)
+      markAsRead(activeConv.id)
     }
   }, [activeConv?.id])
 
@@ -82,9 +84,46 @@ export default function MessagesPage() {
     setConversations(convData)
 
     const convId = searchParams.get('id')
+    const providerIdParam = searchParams.get('provider')
+    const jobIdParam = searchParams.get('job')
+
     if (convId) {
       const found = convData.find(c => c.id === convId)
       if (found) setActiveConv(found)
+    } else if (providerIdParam) {
+      // Look for existing conversation with this provider (and optionally job)
+      let found = convData.find(c => 
+        (c.provider_id === providerIdParam || c.provider_profile?.user_id === providerIdParam) && 
+        (!jobIdParam || c.job_id === jobIdParam)
+      )
+      
+      if (found) {
+        setActiveConv(found)
+      } else {
+        // Create a temporary conversation object for the UI
+        // We'll actually save it when the first message is sent
+        const { data: provProfile } = await supabase
+          .from('provider_profiles')
+          .select('*, profiles(full_name, avatar_url)')
+          .eq('id', providerIdParam)
+          .maybeSingle()
+        
+        if (provProfile) {
+          const tempConv: any = {
+            id: 'temp',
+            hirer_id: user.id,
+            provider_id: provProfile.user_id,
+            job_id: jobIdParam,
+            provider_profile: provProfile.profiles,
+            hirer_profile: null,
+            last_message: null,
+            last_message_at: new Date().toISOString(),
+            hirer_unread: 0,
+            provider_unread: 0
+          }
+          setActiveConv(tempConv)
+        }
+      }
     } else if (convData.length > 0) {
       setActiveConv(convData[0])
     }
@@ -118,20 +157,117 @@ export default function MessagesPage() {
       .subscribe()
   }
 
+  const markAsRead = async (convId: string) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const conv = conversations.find(c => c.id === convId)
+    if (!conv) return
+
+    const isHirer = conv.hirer_id === user.id
+    const update = isHirer ? { hirer_unread: 0 } : { provider_unread: 0 }
+
+    await supabase.from('conversations').update(update).eq('id', convId)
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, ...update } : c))
+  }
+
+  const handleHire = async () => {
+    if (!activeConv || !activeConv.job_id || sending) return
+
+    const confirmed = confirm(`Are you sure you want to hire ${getOtherName(activeConv)} for this job?`)
+    if (!confirmed) return
+
+    setSending(true)
+    try {
+      // 1. Update job
+      const { error: jobErr } = await supabase
+        .from('jobs')
+        .update({ 
+          status: 'in_progress',
+          hired_provider_id: activeConv.provider_id 
+        })
+        .eq('id', activeConv.job_id)
+
+      if (jobErr) throw jobErr
+
+      // 2. Update application status
+      await supabase
+        .from('applications')
+        .update({ status: 'hired' })
+        .eq('job_id', activeConv.job_id)
+        .eq('provider_id', activeConv.provider_id)
+
+      // 3. Send system message
+      const systemMsg = `System: ${getOtherName(activeConv)} has been hired for this job!`
+      await supabase.from('messages').insert({
+        conversation_id: activeConv.id,
+        sender_id: userId,
+        content: systemMsg,
+      })
+
+      // 4. Update local state
+      setActiveConv(prev => prev ? { ...prev, jobs: prev.jobs ? { ...prev.jobs, status: 'in_progress' } : null } : null)
+      toast.success('Provider hired successfully!')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to hire provider')
+    }
+    setSending(false)
+  }
+
   const sendMessage = async () => {
     const text = newMessage.trim()
     if (!text || !activeConv || sending) return
 
     setSending(true)
-    await supabase.from('messages').insert({
-      conversation_id: activeConv.id,
-      sender_id: userId,
-      content: text,
-    })
-    await supabase.from('conversations')
-      .update({ last_message: text, last_message_at: new Date().toISOString() })
-      .eq('id', activeConv.id)
-    setNewMessage('')
+    try {
+      let currentConvId = activeConv.id
+
+      if (currentConvId === 'temp') {
+        // 1. Create real conversation
+        const { data: newConv, error: convErr } = await supabase
+          .from('conversations')
+          .insert({
+            hirer_id: activeConv.hirer_id,
+            provider_id: activeConv.provider_id,
+            job_id: activeConv.job_id,
+            last_message: text,
+            last_message_at: new Date().toISOString(),
+            provider_unread: 1
+          })
+          .select()
+          .single()
+        
+        if (convErr) throw convErr
+        currentConvId = newConv.id
+        setActiveConv({ ...activeConv, id: currentConvId })
+        // Reload list to show new conv
+        loadData()
+      }
+
+      const { data: msg, error } = await supabase.from('messages').insert({
+        conversation_id: currentConvId,
+        sender_id: userId,
+        content: text,
+      }).select().single()
+
+      if (error) throw error
+
+      if (activeConv.id !== 'temp') {
+        // Update other person's unread count
+        const isHirer = activeConv.hirer_id === userId
+        const update = isHirer 
+          ? { last_message: text, last_message_at: new Date().toISOString(), provider_unread: (activeConv.provider_unread || 0) + 1 }
+          : { last_message: text, last_message_at: new Date().toISOString(), hirer_unread: (activeConv.hirer_unread || 0) + 1 }
+
+        await supabase.from('conversations')
+          .update(update)
+          .eq('id', currentConvId)
+      }
+
+      setNewMessage('')
+    } catch (err) {
+      toast.error('Failed to send message')
+    }
     setSending(false)
   }
 
@@ -198,20 +334,31 @@ export default function MessagesPage() {
                   <button onClick={() => setActiveConv(null)} className="md:hidden p-1 rounded-lg hover:bg-surface-hover">
                     <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                   </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white text-sm">{getOtherName(activeConv)}</div>
-                    {activeConv.jobs && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{activeConv.jobs.title}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${
-                          activeConv.jobs.status === 'in_progress' ? 'bg-info-bg text-info' :
-                          activeConv.jobs.status === 'completed' ? 'bg-success-bg text-success' :
-                          'bg-surface-hover text-muted-foreground'
-                        }`}>{activeConv.jobs.status.replace(/_/g, ' ')}</span>
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-white text-sm">{getOtherName(activeConv)}</div>
+                      {activeConv.jobs && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{activeConv.jobs.title}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-xs ${
+                            activeConv.jobs.status === 'in_progress' ? 'bg-info-bg text-info' :
+                            activeConv.jobs.status === 'completed' ? 'bg-success-bg text-success' :
+                            'bg-surface-hover text-muted-foreground'
+                          }`}>{activeConv.jobs.status.replace(/_/g, ' ')}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Hire Action (only for hirer) */}
+                    {activeConv.hirer_id === userId && activeConv.jobs?.status === 'open' && (
+                      <button
+                        onClick={handleHire}
+                        disabled={sending}
+                        className="px-4 py-1.5 rounded-lg bg-success text-white text-xs font-bold hover:bg-success/90 transition-colors flex items-center gap-1"
+                      >
+                        <CheckCircle className="w-3 h-3" /> Hire
+                      </button>
                     )}
                   </div>
-                </div>
               </div>
 
               {/* Messages */}

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
-import { MapPin, IndianRupee, Clock, Users, ArrowLeft, Send, Sparkles, Star, Calendar, CircleCheck as CheckCircle, Trash2 } from 'lucide-react'
+import { MapPin, IndianRupee, Clock, Users, ArrowLeft, Send, Sparkles, Star, Calendar, CircleCheck as CheckCircle, Trash2, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Job {
@@ -44,12 +44,14 @@ export default function JobDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [hasProviderProfile, setHasProviderProfile] = useState(false)
+  const [hasApplied, setHasApplied] = useState(false)
+  const [isHirer, setIsHirer] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
     loadJob()
     checkAuth()
-  }, [id])
+  }, [id, job?.id])
 
   const loadJob = async () => {
     const { data } = await supabase
@@ -69,12 +71,28 @@ export default function JobDetailPage() {
     const { data: { user } } = await supabase.auth.getUser()
     setUser(user)
     if (user) {
+      setIsHirer(job?.profiles?.id === user.id)
+
+      // Check for provider profile
       const { data: provider } = await supabase
         .from('provider_profiles')
         .select('id')
         .eq('user_id', user.id)
         .maybeSingle()
+      
       setHasProviderProfile(!!provider)
+
+      if (provider) {
+        // Check for existing application
+        const { data: application } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('job_id', id)
+          .eq('provider_id', provider.id)
+          .maybeSingle()
+        
+        setHasApplied(!!application)
+      }
     }
   }
 
@@ -275,13 +293,50 @@ export default function JobDetailPage() {
                       <div className="text-xs text-muted-foreground">Member since {formatRelativeTime(job.profiles.created_at)}</div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowApplyModal(true)}
-                    className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                  >
-                    <Send className="w-4 h-4" /> Apply Now
-                  </button>
-                </div>
+                    {/* Actions */}
+                    {!isJobOwner && (
+                      <div className="space-y-3">
+                        {hasApplied ? (
+                          <div className="w-full py-3 rounded-xl bg-success/10 text-success font-medium flex items-center justify-center gap-2 border border-success/20">
+                            <CheckCircle className="w-4 h-4" /> Already Applied
+                          </div>
+                        ) : hasProviderProfile ? (
+                          <button
+                            onClick={() => setShowApplyModal(true)}
+                            className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                          >
+                            <Send className="w-4 h-4" /> Apply Now
+                          </button>
+                        ) : user ? (
+                          <Link
+                            href="/settings/provider"
+                            className="w-full py-3 rounded-xl bg-brand/10 text-brand font-medium hover:bg-brand/20 transition-colors flex items-center justify-center gap-2 border border-brand/20"
+                          >
+                            Become a Provider to Apply
+                          </Link>
+                        ) : (
+                          <Link
+                            href="/signup?role=provider"
+                            className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                          >
+                            Sign in to Apply
+                          </Link>
+                        )}
+                        <Link
+                          href={`/messages?provider=${job.profiles.id}&job=${job.id}`}
+                          className="w-full py-3 rounded-xl border border-surface-border text-muted-foreground hover:text-white hover:border-surface-hover transition-colors flex items-center justify-center gap-2 text-sm"
+                        >
+                          <MessageSquare className="w-4 h-4" /> Message Hirer
+                        </Link>
+                      </div>
+                    )}
+                    {isJobOwner && job.status === 'open' && (
+                      <div className="p-4 rounded-xl bg-brand/5 border border-brand/10 text-center">
+                        <p className="text-xs text-brand mb-2">Manage applications in your dashboard</p>
+                        <Link href="/dashboard" className="text-sm font-bold text-brand hover:underline">Go to Dashboard</Link>
+                      </div>
+                    )}
+                  </div>
               )}
 
               {/* Job Stats */}
