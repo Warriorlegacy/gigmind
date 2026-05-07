@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Save, User, MapPin, Phone, Hash, ArrowRight } from 'lucide-react'
+import { Save, User, MapPin, Phone, Hash, ArrowRight, Camera } from 'lucide-react'
 import { toast } from 'sonner'
+import ProfileAvatar from '@/components/shared/ProfileAvatar'
 
 export default function HirerSettings() {
   const router = useRouter()
@@ -19,7 +20,8 @@ export default function HirerSettings() {
     city: '',
     state: '',
     pincode: '',
-    role: 'hirer'
+    role: 'hirer',
+    avatar_url: ''
   })
 
   useEffect(() => {
@@ -46,7 +48,8 @@ export default function HirerSettings() {
         city: data.city || '',
         state: data.state || '',
         pincode: data.pincode || '',
-        role: data.role || 'hirer'
+        role: data.role || 'hirer',
+        avatar_url: data.avatar_url || ''
       })
     }
     setLoading(false)
@@ -64,6 +67,7 @@ export default function HirerSettings() {
         city: profile.city,
         state: profile.state,
         pincode: profile.pincode,
+        avatar_url: profile.avatar_url,
         updated_at: new Date().toISOString()
       })
       .eq('id', user?.id)
@@ -108,9 +112,24 @@ export default function HirerSettings() {
           <div className="space-y-6">
             {/* Basic Info Card */}
             <div className="p-6 rounded-2xl bg-surface-card border border-surface-border space-y-6">
-              <div className="flex items-center gap-2 text-brand font-semibold mb-2">
+              <div className="flex items-center gap-2 text-brand font-semibold mb-6">
                 <User className="w-5 h-5" />
                 <span>Personal Information</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-8 mb-8 pb-8 border-b border-surface-border/50">
+                <ProfileAvatar 
+                  url={profile.avatar_url} 
+                  onUpload={(url) => setProfile({ ...profile, avatar_url: url })} 
+                />
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-1">Profile Photo</h3>
+                  <p className="text-sm text-muted-foreground mb-4">This will be visible to providers and in your chat interactions.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-[10px] px-2 py-1 rounded bg-brand/10 text-brand font-medium uppercase tracking-wider">JPG, PNG, WEBP</span>
+                    <span className="text-[10px] px-2 py-1 rounded bg-brand/10 text-brand font-medium uppercase tracking-wider">Max 2MB</span>
+                  </div>
+                </div>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">

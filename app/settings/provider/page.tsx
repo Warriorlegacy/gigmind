@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
-import { Save, Sparkles, ArrowRight, ArrowLeft, CircleCheck as CheckCircle, Upload, MapPin, Trash2, FileText } from 'lucide-react'
+import { Save, Sparkles, ArrowRight, ArrowLeft, CircleCheck as CheckCircle, Upload, MapPin, Trash2, FileText, Camera } from 'lucide-react'
 import { toast } from 'sonner'
+import ProfileAvatar from '@/components/shared/ProfileAvatar'
 
 const CATEGORIES = [
   { slug: 'real-estate', name: 'Real Estate', icon: '🏠' },
@@ -75,7 +76,7 @@ export default function ProviderSettingsPage() {
 
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('city, role')
+      .select('city, role, avatar_url')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -200,7 +201,8 @@ export default function ProviderSettingsPage() {
         .from('profiles')
         .update({ 
           city,
-          role: newRole 
+          role: newRole,
+          avatar_url: profile.avatar_url 
         })
         .eq('id', userId)
 
@@ -428,7 +430,22 @@ export default function ProviderSettingsPage() {
           {/* Step Content */}
           <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
             {step === 1 && (
-              <div className="space-y-5 animate-fade-in">
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row gap-8 items-center sm:items-start mb-8 pb-8 border-b border-surface-border/50">
+                  <ProfileAvatar 
+                    url={profile?.avatar_url} 
+                    onUpload={(url) => setProfile({ ...profile, avatar_url: url })} 
+                  />
+                  <div className="flex-1 text-center sm:text-left">
+                    <h3 className="text-xl font-semibold text-white mb-2">Profile Photo</h3>
+                    <p className="text-muted-foreground mb-4">A professional photo helps you stand out and build trust with clients.</p>
+                    <div className="flex justify-center sm:justify-start gap-2">
+                      <span className="text-[10px] px-2 py-1 rounded bg-brand/10 text-brand font-medium uppercase tracking-wider">Professional</span>
+                      <span className="text-[10px] px-2 py-1 rounded bg-brand/10 text-brand font-medium uppercase tracking-wider">Friendly</span>
+                    </div>
+                  </div>
+                </div>
+
                 <h2 className="font-display font-bold text-white text-lg">Basic Info</h2>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Tagline</label>
