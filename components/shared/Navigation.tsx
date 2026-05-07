@@ -27,8 +27,31 @@ export default function Navigation() {
   }, [])
 
   useEffect(() => {
-    if (user) {
-      fetchNotifications()
+    if (!user) return
+
+    fetchNotifications()
+
+    // Subscribe to new notifications
+    const channel = supabase
+      .channel('notifications_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('New notification:', payload)
+          setNotifications(prev => [payload.new, ...prev].slice(0, 5))
+          setHasUnread(true)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }, [user])
 
