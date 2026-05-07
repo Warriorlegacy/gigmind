@@ -69,6 +69,8 @@ export default function DashboardPage() {
   const [isProvider, setIsProvider] = useState(false)
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [stats, setStats] = useState({ applications_count: 0, active_jobs: 0, unread_messages: 0 })
+  const [providerProfile, setProviderProfile] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -120,6 +122,7 @@ export default function DashboardPage() {
         .maybeSingle()
 
       if (provProfile) {
+        setProviderProfile(provProfile)
         // 2. Fetch Sent Applications
         const { data: apps } = await supabase
           .from('applications')
@@ -129,6 +132,14 @@ export default function DashboardPage() {
           .limit(5)
         
         setApplications(apps || [])
+        
+        // Update stats for provider
+        const { count: appCount } = await supabase
+          .from('applications')
+          .select('*', { count: 'exact', head: true })
+          .eq('provider_id', provProfile.id)
+
+        setStats(prev => ({ ...prev, applications_count: appCount || 0 }))
 
         // 3. Fetch Recommended Jobs (based on categories)
         const catIds = provProfile.provider_categories?.map(pc => pc.category_id) || []
@@ -155,8 +166,33 @@ export default function DashboardPage() {
         .limit(5)
       
       setApplications(receivedApps || [])
+      // Update stats for hirer
+      const { count: appCount } = await supabase
+        .from('applications')
+        .select('*, jobs!inner(*)', { count: 'exact', head: true })
+        .eq('jobs.hirer_id', user.id)
+
+      const { count: jobCount } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('hirer_id', user.id)
+        .eq('status', 'open')
+
+      setStats(prev => ({ 
+        ...prev, 
+        applications_count: appCount || 0,
+        active_jobs: jobCount || 0
+      }))
     }
 
+    // Global stats (messages)
+    const { count: msgCount } = await supabase
+      .from('conversations')
+      .select('*', { count: 'exact', head: true })
+      .or(`hirer_unread.gt.0,provider_unread.gt.0`)
+      .or(`hirer_id.eq.${user.id},provider_id.eq.${user.id}`)
+
+    setStats(prev => ({ ...prev, unread_messages: msgCount || 0 }))
     setLoading(false)
 
     // Check for pending job from AI chat
