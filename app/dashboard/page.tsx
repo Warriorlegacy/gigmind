@@ -51,6 +51,12 @@ interface Application {
     budget_max: number | null
     categories: { name: string; icon: string } | null
   } | null
+  provider_profiles?: {
+    profiles: {
+      full_name: string
+      avatar_url: string | null
+    } | null
+  } | null
 }
 
 export default function DashboardPage() {
