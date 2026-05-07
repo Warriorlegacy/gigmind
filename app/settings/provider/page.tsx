@@ -733,6 +733,9 @@ export default function ProviderSettingsPage() {
                     <span>100 km</span>
                   </div>
                 </div>
+              </div>
+            )}
+
             {step === 7 && (
               <div className="space-y-6 animate-fade-in">
                 <h2 className="font-display font-bold text-white text-lg">Account Security</h2>

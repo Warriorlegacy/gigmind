@@ -100,15 +100,6 @@ export default function JobDetailPage() {
         .maybeSingle()
       
       setHasApplied(!!application)
-
-      // Check for provider profile for UI purposes only
-      const { data: provider } = await supabase
-        .from('provider_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      
-      setHasProviderProfile(!!provider)
     }
   }
 

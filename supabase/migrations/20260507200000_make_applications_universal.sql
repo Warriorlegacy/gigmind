@@ -9,6 +9,13 @@ BEGIN
   END IF;
 END $$;
 
+-- IMPORTANT: Convert existing provider_profile IDs to user IDs (profile IDs)
+-- This ensures the new foreign key constraint doesn't fail
+UPDATE public.applications a
+SET applicant_id = p.user_id
+FROM public.provider_profiles p
+WHERE a.applicant_id = p.id;
+
 -- Update foreign key to profiles
 ALTER TABLE public.applications ADD CONSTRAINT applications_applicant_id_fkey FOREIGN KEY (applicant_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
