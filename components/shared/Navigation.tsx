@@ -77,14 +77,24 @@ export default function Navigation() {
   }, [user])
 
   const fetchNotifications = async () => {
+    if (!user) return
     const { data } = await supabase
       .from('notifications')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5)
     
     setNotifications(data || [])
-    setHasUnread(data?.some(n => !n.is_read) ?? false)
+    
+    // Check for ANY unread notification, not just in the last 5
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false)
+    
+    setHasUnread((count ?? 0) > 0)
   }
 
   const handleNotificationsClick = async () => {
