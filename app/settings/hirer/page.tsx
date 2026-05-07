@@ -71,7 +71,7 @@ export default function HirerSettings() {
     if (error) {
       toast.error('Failed to update profile')
     } else {
-      toast.success('Profile updated successfully')
+      toast.success('Profile updated!')
     }
     setSaving(false)
   }

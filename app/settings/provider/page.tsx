@@ -295,7 +295,7 @@ export default function ProviderSettingsPage() {
         }
       }
 
-      toast.success('Profile saved successfully!')
+      toast.success('Profile updated!')
       setTimeout(() => {
         window.location.href = '/dashboard'
       }, 1000)

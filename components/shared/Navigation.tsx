@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Menu, X, Bell, User as UserIcon, LogOut } from 'lucide-react'
+import { Menu, X, Bell, User as UserIcon, LogOut, CheckCircle } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import Logo from './Logo'
 
@@ -11,6 +12,10 @@ export default function Navigation() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const router = useRouter()
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [hasUnread, setHasUnread] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -21,11 +26,46 @@ export default function Navigation() {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (user) {
+      fetchNotifications()
+    }
+  }, [user])
+
+  const fetchNotifications = async () => {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5)
+    
+    setNotifications(data || [])
+    setHasUnread(data?.some(n => !n.is_read) ?? false)
+  }
+
+  const handleNotificationsClick = async () => {
+    setNotificationsOpen(!notificationsOpen)
+    if (!notificationsOpen && user) {
+      // Mark as read when opening
+      await markAsRead()
+      setHasUnread(false)
+    }
+  }
+
+  const markAsRead = async () => {
+    if (!user) return
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false)
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setUser(null)
     setProfileMenuOpen(false)
-    window.location.href = '/'
+    router.push('/')
   }
 
   return (
@@ -37,12 +77,62 @@ export default function Navigation() {
           <div className="hidden md:flex items-center gap-6">
             <Link href="/jobs" className="text-sm text-muted-foreground hover:text-white transition-colors">Browse Jobs</Link>
             <Link href="/providers" className="text-sm text-muted-foreground hover:text-white transition-colors">Find Providers</Link>
+            {user && (
+              <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-white transition-colors">Dashboard</Link>
+            )}
             <Link href="/ai-chat" className="text-sm text-muted-foreground hover:text-white transition-colors">AI Chat</Link>
             {user ? (
               <div className="flex items-center gap-3">
-                <Link href="/messages" className="relative p-2 rounded-lg hover:bg-surface-card transition-colors">
-                  <Bell className="w-5 h-5 text-muted-foreground" />
-                </Link>
+                <div className="relative">
+                  <button 
+                    onClick={handleNotificationsClick}
+                    className="relative p-2 rounded-lg hover:bg-surface-card transition-colors"
+                  >
+                    <Bell className="w-5 h-5 text-muted-foreground" />
+                    {hasUnread && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border border-surface-card" />
+                    )}
+                  </button>
+
+                  {notificationsOpen && (
+                    <div className="absolute right-0 mt-2 w-80 rounded-xl bg-surface-card border border-surface-border shadow-xl py-2 overflow-hidden z-50">
+                      <div className="px-4 py-2 border-b border-surface-border flex items-center justify-between">
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Notifications</span>
+                        <span className="text-[10px] text-muted-foreground">{notifications.length} recent</span>
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.map((n) => (
+                            <div key={n.id} className="px-4 py-3 border-b border-surface-border/50 hover:bg-surface-hover transition-colors last:border-0">
+                              <div className="flex gap-3">
+                                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${n.is_read ? 'bg-transparent' : 'bg-brand'}`} />
+                                <div>
+                                  <div className="text-sm font-medium text-white mb-0.5">{n.title}</div>
+                                  <div className="text-xs text-muted-foreground line-clamp-2">{n.body}</div>
+                                  <div className="text-[10px] text-muted-foreground/60 mt-1">
+                                    {new Date(n.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-8 text-center">
+                            <Bell className="w-8 h-8 text-surface-border mx-auto mb-2" />
+                            <div className="text-sm text-muted-foreground">No notifications yet</div>
+                          </div>
+                        )}
+                      </div>
+                      <Link 
+                        href="/messages" 
+                        onClick={() => setNotificationsOpen(false)}
+                        className="block w-full text-center py-2 text-xs text-brand hover:text-brand-light transition-colors border-t border-surface-border"
+                      >
+                        View all messages
+                      </Link>
+                    </div>
+                  )}
+                </div>
                 <div className="relative">
                   <button
                     onClick={() => setProfileMenuOpen(!profileMenuOpen)}
@@ -82,10 +172,12 @@ export default function Navigation() {
           <div className="px-4 py-4 space-y-3">
             <Link href="/jobs" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>Browse Jobs</Link>
             <Link href="/providers" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>Find Providers</Link>
+            {user && (
+              <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+            )}
             <Link href="/ai-chat" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>AI Chat</Link>
             {user ? (
               <>
-                <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>Dashboard</Link>
                 <Link href="/messages" className="block text-sm text-muted-foreground hover:text-white transition-colors" onClick={() => setMenuOpen(false)}>Messages</Link>
                 <button onClick={handleLogout} className="text-sm text-error">Sign Out</button>
               </>

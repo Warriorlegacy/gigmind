@@ -31,7 +31,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
         
         <svg
           viewBox="0 0 100 100"
-          className="w-full h-full relative z-10 drop-shadow-[0_0_8px_rgba(108,71,255,0.4)]"
+          className="w-full h-full relative z-10 drop-shadow-[0_0_8px_rgba(108,71,255,0.4)] group-hover:rotate-6 transition-transform duration-500"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >

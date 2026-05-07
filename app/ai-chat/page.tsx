@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
-import { Send, Bot, User, MapPin, Briefcase, IndianRupee, Clock, X, ArrowRight, Sparkles } from 'lucide-react'
+import { Send, Bot, User, MapPin, Briefcase, IndianRupee, Clock, X, ArrowRight, Sparkles, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ExtractedJob } from '@/lib/ai/agents'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -184,6 +184,12 @@ export default function AIChatPage() {
       <header className="flex-shrink-0 border-b border-surface-border glass">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => router.back()}
+              className="p-2 rounded-lg hover:bg-surface-card text-muted-foreground hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
             <Logo size="sm" showText={false} />
             <span className="font-display font-bold text-lg text-white hidden sm:block">GigMind AI</span>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
