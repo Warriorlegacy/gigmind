@@ -46,6 +46,8 @@ export default function JobDetailPage() {
   const [hasProviderProfile, setHasProviderProfile] = useState(false)
   const [hasApplied, setHasApplied] = useState(false)
   const [isHirer, setIsHirer] = useState(false)
+  const [jobApplications, setJobApplications] = useState<any[]>([])
+  const [appsLoading, setAppsLoading] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -81,6 +83,13 @@ export default function JobDetailPage() {
         .maybeSingle()
       
       setHasProviderProfile(!!provider)
+      
+      const jobOwner = job?.profiles?.id === user.id
+      setIsHirer(jobOwner)
+
+      if (jobOwner) {
+        fetchJobApplications()
+      }
 
       if (provider) {
         // Check for existing application
@@ -94,6 +103,18 @@ export default function JobDetailPage() {
         setHasApplied(!!application)
       }
     }
+  }
+
+  const fetchJobApplications = async () => {
+    setAppsLoading(true)
+    const { data } = await supabase
+      .from('applications')
+      .select('*, provider_profiles(*, profiles(full_name, avatar_url))')
+      .eq('job_id', id)
+      .order('created_at', { ascending: false })
+    
+    if (data) setJobApplications(data)
+    setAppsLoading(false)
   }
 
   const generateAIProposal = async () => {
@@ -150,6 +171,17 @@ export default function JobDetailPage() {
       })
 
       if (error) throw error
+
+      // Notify the hirer
+      if (job?.profiles?.id) {
+        await supabase.from('notifications').insert({
+          user_id: job.profiles.id,
+          title: 'New Job Application',
+          body: `Someone applied to your job: "${job.title}"`,
+          type: 'application',
+          link: `/jobs/${id}`
+        })
+      }
 
       await supabase.from('jobs').update({
         applications_count: (job?.applications_count || 0) + 1,
@@ -270,9 +302,80 @@ export default function JobDetailPage() {
                 </div>
 
                 {job.requirements && (
-                  <div className="mt-6">
+                  <div className="mt-6 pb-6 border-b border-surface-border/50">
                     <h3 className="font-display font-bold text-white text-lg mb-2">Requirements</h3>
                     <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">{job.requirements}</p>
+                  </div>
+                )}
+
+                {isHirer && (
+                  <div className="mt-8 animate-fade-in">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="font-display text-xl font-bold text-white flex items-center gap-2">
+                        Applications <span className="text-sm font-normal text-muted-foreground">({jobApplications.length})</span>
+                      </h2>
+                    </div>
+
+                    {appsLoading ? (
+                      <div className="space-y-4">
+                        {[1, 2].map(i => (
+                          <div key={i} className="h-32 rounded-2xl bg-surface-hover animate-pulse" />
+                        ))}
+                      </div>
+                    ) : jobApplications.length > 0 ? (
+                      <div className="space-y-4">
+                        {jobApplications.map((app) => (
+                          <div key={app.id} className="p-6 rounded-2xl bg-surface border border-surface-border hover:border-brand/30 transition-all group">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full overflow-hidden bg-brand/10 border border-brand/20">
+                                  {app.provider_profiles?.profiles?.avatar_url ? (
+                                    <img src={app.provider_profiles.profiles.avatar_url} className="w-full h-full object-cover" alt="" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-brand font-bold">
+                                      {app.provider_profiles?.profiles?.full_name?.charAt(0)}
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-white">{app.provider_profiles?.profiles?.full_name}</div>
+                                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatRelativeTime(app.created_at)}</span>
+                                    {app.proposed_amount && <span className="flex items-center gap-1"><IndianRupee className="w-3 h-3" /> {formatINR(app.proposed_amount)}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                                  app.status === 'hired' ? 'bg-success-bg text-success' :
+                                  app.status === 'shortlisted' ? 'bg-info-bg text-info' :
+                                  app.status === 'rejected' ? 'bg-error-bg text-error' :
+                                  'bg-surface-hover text-muted-foreground'
+                                }`}>{app.status}</span>
+                                <Link 
+                                  href={`/messages?provider=${app.provider_profiles?.user_id}&job=${id}`}
+                                  className="p-2 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
+                                >
+                                  <MessageSquare className="w-4 h-4" />
+                                </Link>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground bg-surface-card/50 p-4 rounded-xl border border-surface-border/50 italic mb-4">
+                              "{app.cover_letter}"
+                            </div>
+                            <div className="flex gap-3">
+                              <button className="flex-1 py-2 rounded-lg bg-brand text-white text-xs font-medium hover:bg-brand-dark transition-colors">Hire Now</button>
+                              <button className="flex-1 py-2 rounded-lg border border-surface-border text-muted-foreground text-xs font-medium hover:text-white transition-colors">Shortlist</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 bg-surface rounded-2xl border border-surface-border border-dashed">
+                        <Users className="w-10 h-10 text-surface-border mx-auto mb-3" />
+                        <p className="text-muted-foreground">No applications yet. Your job is live!</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

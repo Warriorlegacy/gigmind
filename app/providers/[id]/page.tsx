@@ -121,8 +121,16 @@ export default function ProviderProfilePage() {
               <div className="relative">
                 <div className="h-32 sm:h-40 rounded-2xl bg-brand-gradient opacity-20" />
                 <div className="absolute -bottom-8 left-6 flex items-end gap-4">
-                  <div className="w-20 h-20 rounded-2xl bg-surface-card border-4 border-surface flex items-center justify-center">
-                    <span className="text-3xl font-display font-bold text-brand">{provider.profiles?.full_name?.charAt(0) || '?'}</span>
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-surface-card border-4 border-surface flex items-center justify-center overflow-hidden">
+                    {provider.profiles?.avatar_url ? (
+                      <img 
+                        src={provider.profiles.avatar_url} 
+                        className="w-full h-full object-cover" 
+                        alt={provider.profiles.full_name} 
+                      />
+                    ) : (
+                      <span className="text-3xl font-display font-bold text-brand">{provider.profiles?.full_name?.charAt(0) || '?'}</span>
+                    )}
                   </div>
                   <div className="pb-2">
                     <div className="flex items-center gap-2">

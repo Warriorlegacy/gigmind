@@ -18,13 +18,34 @@ export default function Navigation() {
   const [hasUnread, setHasUnread] = useState(false)
   const supabase = createClient()
 
+  const [profile, setProfile] = useState<any>(null)
+
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      if (user) fetchProfile(user.id)
+    }
+
+    checkUser()
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const newUser = session?.user ?? null
+      setUser(newUser)
+      if (newUser) fetchProfile(newUser.id)
+      else setProfile(null)
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('avatar_url, full_name')
+      .eq('id', userId)
+      .maybeSingle()
+    if (data) setProfile(data)
+  }
 
   useEffect(() => {
     if (!user) return
@@ -109,9 +130,12 @@ export default function Navigation() {
                 <div className="relative">
                   <button 
                     onClick={handleNotificationsClick}
-                    className="relative p-2 rounded-lg hover:bg-surface-card transition-colors"
+                    className={`relative p-2 rounded-lg transition-all ${hasUnread ? 'bg-brand/10 text-brand' : 'hover:bg-surface-card text-muted-foreground hover:text-white'}`}
                   >
-                    <Bell className="w-5 h-5 text-muted-foreground" />
+                    <Bell className={`w-5 h-5 ${hasUnread ? 'animate-wiggle' : ''}`} />
+                    {hasUnread && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border border-surface-card animate-ping" />
+                    )}
                     {hasUnread && (
                       <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border border-surface-card" />
                     )}
@@ -161,8 +185,16 @@ export default function Navigation() {
                     onClick={() => setProfileMenuOpen(!profileMenuOpen)}
                     className="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-card transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-brand-gradient flex items-center justify-center">
-                      <UserIcon className="w-4 h-4 text-white" />
+                    <div className="w-8 h-8 rounded-full bg-brand-gradient flex items-center justify-center overflow-hidden border border-white/10 group">
+                      {profile?.avatar_url ? (
+                        <img 
+                          src={profile.avatar_url} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                        />
+                      ) : (
+                        <UserIcon className="w-4 h-4 text-white" />
+                      )}
                     </div>
                   </button>
                   {profileMenuOpen && (

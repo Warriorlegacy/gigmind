@@ -139,6 +139,16 @@ export default function DashboardPage() {
           setRecommendedJobs(recJobs || [])
         }
       }
+    } else {
+      // Hirer specific logic: Fetch applications received for my jobs
+      const { data: receivedApps } = await supabase
+        .from('applications')
+        .select('*, jobs!inner(hirer_id, title), provider_profiles(profiles(full_name, avatar_url))')
+        .eq('jobs.hirer_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      
+      setApplications(receivedApps || [])
     }
 
     setLoading(false)
@@ -424,50 +434,86 @@ export default function DashboardPage() {
               </div>
             ) : (
               /* Hirer View: Active Jobs */
-              <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display font-bold text-white">My Active Jobs</h2>
-                  <Link href="/jobs" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
+              <div className="space-y-6">
+                {/* My Active Jobs */}
+                <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-bold text-white">My Active Jobs</h2>
+                    <Link href="/jobs" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
+                  </div>
+                  {jobs.length > 0 ? (
+                    <div className="space-y-3">
+                      {jobs.map((job) => (
+                        <div key={job.id} className="p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors group flex items-start justify-between">
+                          <Link href={`/jobs/${job.id}`} className="flex-1 block">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-white text-sm truncate">{job.title}</span>
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                job.status === 'open' ? 'bg-success-bg text-success' : 'bg-info-bg text-info'
+                              }`}>{job.status.replace(/_/g, ' ')}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                              {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
+                              {job.city && <span>{job.city}</span>}
+                              <span>{job.applications_count} applications</span>
+                            </div>
+                          </Link>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              setShowDeleteConfirm(job.id)
+                            }}
+                            className="ml-2 p-1.5 rounded-lg bg-error/10 text-error opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/20"
+                            title="Cancel job"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Briefcase className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground text-sm mb-3">No active jobs yet</p>
+                      <Link href="/ai-chat" className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium inline-flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> Post with AI
+                      </Link>
+                    </div>
+                  )}
                 </div>
-                {jobs.length > 0 ? (
-                  <div className="space-y-3">
-                    {jobs.map((job) => (
-                      <div key={job.id} className="p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors group flex items-start justify-between">
-                        <Link href={`/jobs/${job.id}`} className="flex-1 block">
+
+                {/* Recent Applications Received */}
+                <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-bold text-white">Recent Applications</h2>
+                    <Link href="/dashboard/applications" className="text-brand text-sm hover:text-brand-light flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
+                  </div>
+                  {applications.length > 0 ? (
+                    <div className="space-y-3">
+                      {applications.map((app) => (
+                        <Link key={app.id} href={`/jobs/${app.job_id}`} className="block p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-white text-sm truncate">{job.title}</span>
+                            <span className="font-medium text-white text-sm">{app.provider_profiles?.profiles?.full_name}</span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                              job.status === 'open' ? 'bg-success-bg text-success' : 'bg-info-bg text-info'
-                            }`}>{job.status.replace(/_/g, ' ')}</span>
+                              app.status === 'hired' ? 'bg-success-bg text-success' :
+                              app.status === 'shortlisted' ? 'bg-info-bg text-info' :
+                              'bg-surface-hover text-muted-foreground'
+                            }`}>{app.status}</span>
                           </div>
                           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                            {job.categories && <span>{job.categories.icon} {job.categories.name}</span>}
-                            {job.city && <span>{job.city}</span>}
-                            <span>{job.applications_count} applications</span>
+                            <span className="truncate">Job: {app.jobs?.title}</span>
+                            <span>{formatRelativeTime(app.created_at)}</span>
                           </div>
                         </Link>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            setShowDeleteConfirm(job.id)
-                          }}
-                          className="ml-2 p-1.5 rounded-lg bg-error/10 text-error opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/20"
-                          title="Cancel job"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Briefcase className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground text-sm mb-3">No active jobs yet</p>
-                    <Link href="/ai-chat" className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-medium inline-flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" /> Post with AI
-                    </Link>
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground text-sm">No applications received yet</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
