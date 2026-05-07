@@ -146,13 +146,30 @@ export default function JobsPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1.5">City</label>
-                  <input
-                    type="text"
+                  <select
                     value={city}
                     onChange={(e) => { setCity(e.target.value); setPage(1) }}
-                    placeholder="e.g. Lucknow, Kanpur"
-                    className="w-full px-3 py-2 rounded-lg bg-surface border border-surface-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-brand/50"
-                  />
+                    className="w-full px-3 py-2 rounded-lg bg-surface border border-surface-border text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+                  >
+                    <option value="">All Cities</option>
+                    <optgroup label="Metros">
+                      <option value="Delhi">Delhi / NCR</option>
+                      <option value="Mumbai">Mumbai</option>
+                      <option value="Bangalore">Bangalore</option>
+                      <option value="Hyderabad">Hyderabad</option>
+                      <option value="Chennai">Chennai</option>
+                      <option value="Kolkata">Kolkata</option>
+                    </optgroup>
+                    <optgroup label="Major Cities">
+                      <option value="Lucknow">Lucknow</option>
+                      <option value="Kanpur">Kanpur</option>
+                      <option value="Pune">Pune</option>
+                      <option value="Ahmedabad">Ahmedabad</option>
+                      <option value="Jaipur">Jaipur</option>
+                      <option value="Chandigarh">Chandigarh</option>
+                      <option value="Indore">Indore</option>
+                    </optgroup>
+                  </select>
                 </div>
               </div>
             </div>

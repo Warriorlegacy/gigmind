@@ -183,13 +183,21 @@ export default function AIChatPage() {
       {/* Header */}
       <header className="flex-shrink-0 border-b border-surface-border glass">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => router.back()}
               className="p-2 rounded-lg hover:bg-surface-card text-muted-foreground hover:text-white transition-colors"
+              title="Back"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
+            <Link 
+              href="/"
+              className="p-2 rounded-lg hover:bg-surface-card text-muted-foreground hover:text-white transition-colors"
+              title="Home"
+            >
+              <Users className="w-5 h-5" />
+            </Link>
             <Logo size="sm" showText={false} />
             <span className="font-display font-bold text-lg text-white hidden sm:block">GigMind AI</span>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">

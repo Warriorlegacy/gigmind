@@ -410,19 +410,19 @@ export default function ProviderSettingsPage() {
           <p className="text-muted-foreground text-sm mb-8">Complete your profile to start receiving job matches</p>
 
           {/* Step Indicator */}
-          <div className="flex items-center gap-2 mb-8 overflow-x-auto scrollbar-hide pb-2">
+          <div className="flex items-center gap-2 mb-8 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
             {STEPS.map((s) => (
               <button
                 key={s.id}
                 onClick={() => setStep(s.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                  step === s.id ? 'bg-brand text-white' :
-                  step > s.id ? 'bg-success-bg text-success' :
-                  'bg-surface-card border border-surface-border text-muted-foreground'
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] sm:text-xs font-bold whitespace-nowrap transition-all border ${
+                  step === s.id ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20' :
+                  step > s.id ? 'bg-success/10 border-success/20 text-success' :
+                  'bg-surface-card border-surface-border text-muted-foreground hover:text-white'
                 }`}
               >
-                {step > s.id ? <CheckCircle className="w-3.5 h-3.5" /> : <span>{s.id}</span>}
-                {s.title}
+                {step > s.id ? <CheckCircle className="w-3.5 h-3.5" /> : <span className="w-4 h-4 rounded-full bg-surface-card border border-inherit flex items-center justify-center text-[8px]">{s.id}</span>}
+                {s.title.split(' ')[0]}
               </button>
             ))}
           </div>
@@ -461,8 +461,9 @@ export default function ProviderSettingsPage() {
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Experience (years)</label>
                   <input
                     type="number"
+                    min="0"
                     value={experienceYears}
-                    onChange={(e) => setExperienceYears(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setExperienceYears(Math.max(0, parseInt(e.target.value) || 0))}
                     className="w-full px-4 py-3 rounded-xl bg-surface border border-surface-border text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                   />
                 </div>
@@ -647,6 +648,27 @@ export default function ProviderSettingsPage() {
                         </div>
                       )}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="flex items-center gap-2">
+            <button 
+              onClick={() => router.back()}
+              className="p-2 rounded-lg hover:bg-surface-card text-muted-foreground hover:text-white transition-colors"
+              title="Back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <Link 
+              href="/"
+              className="p-2 rounded-lg hover:bg-surface-card text-muted-foreground hover:text-white transition-colors"
+              title="Home"
+            >
+              <Users className="w-5 h-5" />
+            </Link>
+            <Logo size="sm" showText={false} />
+            <span className="font-display font-bold text-lg text-white hidden sm:block">GigMind AI</span>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
+              <Sparkles className="w-3 h-3" /> AI Assistant
+            </div>
+          </div>
                         <button
                           onClick={() => removePortfolioItem(item.id || item.media_url, item.isNew)}
                           className="p-2 rounded-full bg-error/20 text-error hover:bg-error/30 transition-colors"

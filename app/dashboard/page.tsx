@@ -254,6 +254,75 @@ export default function DashboardPage() {
             </Link>
           </div>
 
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {/* Applications Card */}
+            <div className="p-6 rounded-2xl bg-surface-card border border-surface-border hover:border-brand/30 transition-all group">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center text-info group-hover:scale-110 transition-transform">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-white">{stats.applications_count}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Leads Received</div>
+                </div>
+              </div>
+              <Link 
+                href="/dashboard/applications" 
+                className="w-full py-2.5 rounded-xl bg-surface border border-surface-border text-white text-sm font-medium hover:bg-surface-hover transition-colors flex items-center justify-center gap-2"
+              >
+                View All Leads <ArrowRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
+            </div>
+
+            {/* View Profile Card */}
+            <div className="p-6 rounded-2xl bg-surface-card border border-surface-border hover:border-brand/30 transition-all group">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center text-success group-hover:scale-110 transition-transform">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-white">{stats.active_jobs}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Active Jobs</div>
+                </div>
+              </div>
+              {providerProfile ? (
+                <Link 
+                  href={`/providers/${providerProfile.id}`}
+                  className="w-full py-2.5 rounded-xl bg-surface border border-surface-border text-white text-sm font-medium hover:bg-surface-hover transition-colors flex items-center justify-center gap-2"
+                >
+                  View Public Profile <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                </Link>
+              ) : (
+                <Link 
+                  href="/settings/provider"
+                  className="w-full py-2.5 rounded-xl bg-brand/10 text-brand text-sm font-medium hover:bg-brand/20 transition-colors flex items-center justify-center gap-2"
+                >
+                  Setup Provider Profile <ArrowRight className="w-4 h-4" />
+                </Link>
+              )}
+            </div>
+
+            {/* Messaging Quick Link */}
+            <div className="p-6 rounded-2xl bg-surface-card border border-surface-border hover:border-brand/30 transition-all group">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand group-hover:scale-110 transition-transform">
+                  <MessageSquare className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-white">{stats.unread_messages}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Messages</div>
+                </div>
+              </div>
+              <Link 
+                href="/messages" 
+                className="w-full py-2.5 rounded-xl bg-surface border border-surface-border text-white text-sm font-medium hover:bg-surface-hover transition-colors flex items-center justify-center gap-2"
+              >
+                Go to Inbox <ArrowRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
+            </div>
+          </div>
+
           {/* Stats Cards */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {isProvider ? (

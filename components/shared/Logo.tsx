@@ -66,7 +66,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
           />
 
           {/* Neural Nodes */}
-          <circle cx="15" cy="50" r="4" fill="white" className="animate-pulse" />
+          <circle cx="15" cy="50" r="4" fill="white" className="group-hover:animate-pulse" />
           <circle cx="50" cy="85" r="4" fill="white" />
           <circle cx="50" cy="15" r="4" fill="white" />
           <circle cx="85" cy="50" r="6" fill="white" filter="url(#neonGlow)" />

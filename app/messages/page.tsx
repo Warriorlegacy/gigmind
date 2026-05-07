@@ -71,14 +71,19 @@ export default function MessagesPage() {
 
     const { data } = await supabase
       .from('conversations')
-      .select('*, jobs(title, status), profiles!conversations_hirer_id_fkey(id, full_name, avatar_url), provider_profile:provider_profiles(user_id, profiles(full_name, avatar_url))')
+      .select(`
+        *,
+        jobs(title, status),
+        hirer:profiles!conversations_hirer_id_fkey(id, full_name, avatar_url),
+        provider:profiles!conversations_provider_id_fkey(id, full_name, avatar_url)
+      `)
       .or(`hirer_id.eq.${user.id},provider_id.eq.${user.id}`)
       .order('last_message_at', { ascending: false })
 
     const convData = (data || []).map((c: any) => ({
       ...c,
-      hirer_profile: c.hirer_id === user.id ? null : c.profiles,
-      provider_profile: c.provider_id === user.id ? null : { ...c.provider_profile?.profiles, user_id: c.provider_profile?.user_id },
+      hirer_profile: c.hirer_id === user.id ? null : c.hirer,
+      provider_profile: c.provider_id === user.id ? null : c.provider,
     })) as Conversation[]
 
     setConversations(convData)
@@ -105,7 +110,7 @@ export default function MessagesPage() {
         const { data: provProfile } = await supabase
           .from('provider_profiles')
           .select('*, profiles(full_name, avatar_url)')
-          .eq('id', providerIdParam)
+          .eq('user_id', providerIdParam)
           .maybeSingle()
         
         if (provProfile) {
