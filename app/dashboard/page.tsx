@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
-import { Briefcase, IndianRupee, MessageSquare, Plus, TrendingUp, Star, ArrowRight, Clock, Users, Sparkles, Crown, Trash2 } from 'lucide-react'
+import { Briefcase, IndianRupee, MessageSquare, Plus, TrendingUp, Star, ArrowRight, Clock, Users, Sparkles, Crown, Trash2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Profile {

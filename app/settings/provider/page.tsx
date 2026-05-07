@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
-import { Save, Sparkles, ArrowRight, ArrowLeft, CircleCheck as CheckCircle, Upload, MapPin, Trash2, FileText, Camera } from 'lucide-react'
+import { Save, Sparkles, ArrowRight, ArrowLeft, CircleCheck as CheckCircle, Upload, MapPin, Trash2, FileText, Camera, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import ProfileAvatar from '@/components/shared/ProfileAvatar'
 
