@@ -91,17 +91,24 @@ export default function JobDetailPage() {
         fetchJobApplications()
       }
 
-      if (provider) {
-        // Check for existing application
-        const { data: application } = await supabase
-          .from('applications')
-          .select('id')
-          .eq('job_id', id)
-          .eq('provider_id', provider.id)
-          .maybeSingle()
-        
-        setHasApplied(!!application)
-      }
+      // Check for existing application
+      const { data: application } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('job_id', id)
+        .eq('applicant_id', user.id)
+        .maybeSingle()
+      
+      setHasApplied(!!application)
+
+      // Check for provider profile for UI purposes only
+      const { data: provider } = await supabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      
+      setHasProviderProfile(!!provider)
     }
   }
 
@@ -109,7 +116,7 @@ export default function JobDetailPage() {
     setAppsLoading(true)
     const { data } = await supabase
       .from('applications')
-      .select('*, provider_profiles(*, profiles(full_name, avatar_url))')
+      .select('*, profiles:applicant_id(*)')
       .eq('job_id', id)
       .order('created_at', { ascending: false })
     
@@ -148,23 +155,15 @@ export default function JobDetailPage() {
   }
 
   const handleApply = async () => {
-    if (!user || !hasProviderProfile) {
-      router.push('/signup?role=provider')
+    if (!user) {
+      router.push('/signup')
       return
     }
     setSubmitting(true)
     try {
-      const { data: provider } = await supabase
-        .from('provider_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (!provider) return
-
       const { error } = await supabase.from('applications').insert({
         job_id: id,
-        provider_id: provider.id,
+        applicant_id: user.id,
         cover_letter: coverLetter,
         proposed_amount: proposedAmount ? parseFloat(proposedAmount) : null,
         proposed_timeline: proposedTimeline,
@@ -328,17 +327,17 @@ export default function JobDetailPage() {
                           <div key={app.id} className="p-6 rounded-2xl bg-surface border border-surface-border hover:border-brand/30 transition-all group">
                             <div className="flex items-start justify-between mb-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full overflow-hidden bg-brand/10 border border-brand/20">
-                                  {app.provider_profiles?.profiles?.avatar_url ? (
-                                    <img src={app.provider_profiles.profiles.avatar_url} className="w-full h-full object-cover" alt="" />
+                                <Link href={`/profile/${app.profiles?.id}`} className="w-12 h-12 rounded-full overflow-hidden bg-brand/10 border border-brand/20 hover:ring-2 hover:ring-brand transition-all">
+                                  {app.profiles?.avatar_url ? (
+                                    <img src={app.profiles.avatar_url} className="w-full h-full object-cover" alt="" />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center text-brand font-bold">
-                                      {app.provider_profiles?.profiles?.full_name?.charAt(0)}
+                                      {app.profiles?.full_name?.charAt(0)}
                                     </div>
                                   )}
-                                </div>
+                                </Link>
                                 <div>
-                                  <div className="font-bold text-white">{app.provider_profiles?.profiles?.full_name}</div>
+                                  <Link href={`/profile/${app.profiles?.id}`} className="font-bold text-white hover:text-brand transition-colors">{app.profiles?.full_name}</Link>
                                   <div className="text-xs text-muted-foreground flex items-center gap-2">
                                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatRelativeTime(app.created_at)}</span>
                                     {app.proposed_amount && <span className="flex items-center gap-1"><IndianRupee className="w-3 h-3" /> {formatINR(app.proposed_amount)}</span>}
@@ -353,7 +352,7 @@ export default function JobDetailPage() {
                                   'bg-surface-hover text-muted-foreground'
                                 }`}>{app.status}</span>
                                 <Link 
-                                  href={`/messages?provider=${app.provider_profiles?.user_id}&job=${id}`}
+                                  href={`/messages?recipient=${app.profiles?.id}&job=${id}`}
                                   className="p-2 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
                                 >
                                   <MessageSquare className="w-4 h-4" />
@@ -388,11 +387,15 @@ export default function JobDetailPage() {
                 <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
                   <h3 className="font-display font-bold text-white text-sm mb-4">Posted By</h3>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center">
-                      <span className="text-brand font-bold text-sm">{job.profiles.full_name?.charAt(0) || '?'}</span>
-                    </div>
+                    <Link href={`/profile/${job.profiles.id}`} className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center hover:ring-2 hover:ring-brand transition-all overflow-hidden">
+                      {job.profiles.avatar_url ? (
+                        <img src={job.profiles.avatar_url} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        <span className="text-brand font-bold text-sm">{job.profiles.full_name?.charAt(0) || '?'}</span>
+                      )}
+                    </Link>
                     <div>
-                      <div className="font-medium text-white text-sm">{job.profiles.full_name}</div>
+                      <Link href={`/profile/${job.profiles.id}`} className="font-medium text-white text-sm hover:text-brand transition-colors">{job.profiles.full_name}</Link>
                       <div className="text-xs text-muted-foreground">Member since {formatRelativeTime(job.profiles.created_at)}</div>
                     </div>
                   </div>
@@ -403,30 +406,16 @@ export default function JobDetailPage() {
                           <div className="w-full py-3 rounded-xl bg-success/10 text-success font-medium flex items-center justify-center gap-2 border border-success/20">
                             <CheckCircle className="w-4 h-4" /> Already Applied
                           </div>
-                        ) : hasProviderProfile ? (
+                        ) : (
                           <button
                             onClick={() => setShowApplyModal(true)}
                             className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                           >
                             <Send className="w-4 h-4" /> Apply Now
                           </button>
-                        ) : user ? (
-                          <Link
-                            href="/settings/provider"
-                            className="w-full py-3 rounded-xl bg-brand/10 text-brand font-medium hover:bg-brand/20 transition-colors flex items-center justify-center gap-2 border border-brand/20"
-                          >
-                            Become a Provider to Apply
-                          </Link>
-                        ) : (
-                          <Link
-                            href="/signup?role=provider"
-                            className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                          >
-                            Sign in to Apply
-                          </Link>
                         )}
                         <Link
-                          href={`/messages?provider=${job.profiles.id}&job=${job.id}`}
+                          href={`/messages?recipient=${job.profiles.id}&job=${job.id}`}
                           className="w-full py-3 rounded-xl border border-surface-border text-muted-foreground hover:text-white hover:border-surface-hover transition-colors flex items-center justify-center gap-2 text-sm"
                         >
                           <MessageSquare className="w-4 h-4" /> Message Hirer

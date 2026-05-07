@@ -33,6 +33,7 @@ const STEPS = [
   { id: 4, title: 'Rate Card' },
   { id: 5, title: 'Portfolio' },
   { id: 6, title: 'Location & Radius' },
+  { id: 7, title: 'Account Security' },
 ]
 
 export default function ProviderSettingsPage() {
@@ -61,6 +62,7 @@ export default function ProviderSettingsPage() {
   const [rateProjectMax, setRateProjectMax] = useState('')
   const [city, setCity] = useState('')
   const [serviceRadius, setServiceRadius] = useState(20)
+  const [userEmail, setUserEmail] = useState('')
 
   // AI Bio Q&A
   const [aiAnswers, setAiAnswers] = useState({
@@ -75,10 +77,11 @@ export default function ProviderSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     setUserId(user.id)
+    setUserEmail(user.email || '')
 
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('city, role, avatar_url')
+      .select('city, role, avatar_url, phone')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -204,7 +207,8 @@ export default function ProviderSettingsPage() {
         .update({ 
           city,
           role: newRole,
-          avatar_url: profile.avatar_url 
+          avatar_url: profile.avatar_url,
+          phone: profile.phone
         })
         .eq('id', userId)
 
@@ -470,6 +474,16 @@ export default function ProviderSettingsPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Phone Number</label>
+                  <input
+                    type="text"
+                    value={profile?.phone || ''}
+                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    placeholder="+91 00000 00000"
+                    className="w-full px-4 py-3 rounded-xl bg-surface border border-surface-border text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Availability</label>
                   <div className="flex gap-3">
                     {['immediate', 'within_week', 'custom'].map((a) => (
@@ -719,6 +733,91 @@ export default function ProviderSettingsPage() {
                     <span>100 km</span>
                   </div>
                 </div>
+            {step === 7 && (
+              <div className="space-y-6 animate-fade-in">
+                <h2 className="font-display font-bold text-white text-lg">Account Security</h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5 ml-1">Email Address</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        id="provider-email-input"
+                        defaultValue={userEmail}
+                        className="flex-1 px-4 py-3 rounded-xl bg-surface border border-surface-border text-white focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
+                      />
+                      <button 
+                        onClick={async () => {
+                          const email = (document.getElementById('provider-email-input') as HTMLInputElement).value;
+                          const { error } = await supabase.auth.updateUser({ email });
+                          if (error) toast.error(error.message);
+                          else toast.success('Confirmation email sent');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-surface border border-surface-border text-white text-xs font-medium hover:bg-surface-hover transition-colors"
+                      >
+                        Update Email
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5 ml-1">Change Password</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        id="provider-password-input"
+                        placeholder="New Password"
+                        className="flex-1 px-4 py-3 rounded-xl bg-surface border border-surface-border text-white focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
+                      />
+                      <button 
+                        onClick={async () => {
+                          const password = (document.getElementById('provider-password-input') as HTMLInputElement).value;
+                          if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+                          const { error } = await supabase.auth.updateUser({ password });
+                          if (error) toast.error(error.message);
+                          else {
+                            toast.success('Password updated!');
+                            (document.getElementById('provider-password-input') as HTMLInputElement).value = '';
+                          }
+                        }}
+                        className="px-4 py-2 rounded-xl bg-surface border border-surface-border text-white text-xs font-medium hover:bg-surface-hover transition-colors"
+                      >
+                        Update Password
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-surface-border">
+                  <div className="flex items-center gap-2 text-error font-semibold mb-4">
+                    <Trash2 className="w-5 h-5" />
+                    <span>Danger Zone</span>
+                  </div>
+                  <div className="p-4 rounded-xl bg-error/5 border border-error/10">
+                    <h4 className="text-white text-sm font-semibold">Delete Account</h4>
+                    <p className="text-muted-foreground text-xs mt-1 mb-4">This will permanently delete your provider profile, applications, portfolio, and user account.</p>
+                    <button
+                      onClick={async () => {
+                        if (confirm('Delete everything permanently?')) {
+                          setSaving(true);
+                          const res = await fetch('/api/account/delete', { method: 'POST' });
+                          if (res.ok) {
+                            toast.success('Account deleted');
+                            await supabase.auth.signOut();
+                            router.push('/');
+                          } else {
+                            toast.error('Deletion failed');
+                          }
+                          setSaving(false);
+                        }
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-error text-white text-sm font-bold hover:bg-error/80 transition-all"
+                    >
+                      Permanently Delete Account
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -731,7 +830,7 @@ export default function ProviderSettingsPage() {
               >
                 <ArrowLeft className="w-4 h-4" /> Previous
               </button>
-              {step < 6 ? (
+              {step < 7 ? (
                 <button
                   onClick={() => setStep(step + 1)}
                   className="px-6 py-2.5 rounded-xl bg-brand text-white font-medium hover:bg-brand-dark transition-colors flex items-center gap-2 text-sm"

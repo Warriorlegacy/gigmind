@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Save, User, MapPin, Phone, Hash, ArrowRight, Camera } from 'lucide-react'
+import { Save, User, MapPin, Phone, Hash, ArrowRight, Camera, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import ProfileAvatar from '@/components/shared/ProfileAvatar'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export default function HirerSettings() {
   const router = useRouter()
@@ -14,6 +15,7 @@ export default function HirerSettings() {
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState({
     full_name: '',
     phone: '',
@@ -34,6 +36,7 @@ export default function HirerSettings() {
       router.push('/login')
       return
     }
+    setUser(user)
 
     const { data, error } = await supabase
       .from('profiles')
@@ -207,6 +210,66 @@ export default function HirerSettings() {
               </div>
             </div>
 
+            {/* Account Security Card */}
+            <div className="p-6 rounded-2xl bg-surface-card border border-surface-border space-y-6">
+              <div className="flex items-center gap-2 text-brand font-semibold mb-2">
+                <Hash className="w-5 h-5" />
+                <span>Account Security</span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5 ml-1">Email Address</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      defaultValue={user?.email}
+                      className="flex-1 px-4 py-3 rounded-xl bg-surface border border-surface-border text-white focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
+                      id="email-input"
+                    />
+                    <button 
+                      onClick={async () => {
+                        const email = (document.getElementById('email-input') as HTMLInputElement).value;
+                        const { error } = await supabase.auth.updateUser({ email });
+                        if (error) toast.error(error.message);
+                        else toast.success('Confirmation email sent to both old and new addresses');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-surface border border-surface-border text-white text-xs font-medium hover:bg-surface-hover transition-colors"
+                    >
+                      Update Email
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5 ml-1">Change Password</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="New Password"
+                      className="flex-1 px-4 py-3 rounded-xl bg-surface border border-surface-border text-white focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
+                      id="password-input"
+                    />
+                    <button 
+                      onClick={async () => {
+                        const password = (document.getElementById('password-input') as HTMLInputElement).value;
+                        if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+                        const { error } = await supabase.auth.updateUser({ password });
+                        if (error) toast.error(error.message);
+                        else {
+                          toast.success('Password updated successfully!');
+                          (document.getElementById('password-input') as HTMLInputElement).value = '';
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-surface border border-surface-border text-white text-xs font-medium hover:bg-surface-hover transition-colors"
+                    >
+                      Update Password
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Provider Switch Card */}
             {profile.role === 'hirer' && (
               <div className="p-6 rounded-2xl bg-brand/5 border border-brand/20 space-y-4">
@@ -227,6 +290,56 @@ export default function HirerSettings() {
                 </div>
               </div>
             )}
+
+            {/* Danger Zone */}
+            <div className="p-6 rounded-2xl bg-error/5 border border-error/20 space-y-6">
+              <div className="flex items-center gap-2 text-error font-semibold">
+                <Trash2 className="w-5 h-5" />
+                <span>Danger Zone</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-surface/50 border border-error/10">
+                <div>
+                  <h4 className="text-white font-semibold">Delete Account</h4>
+                  <p className="text-muted-foreground text-xs mt-1">Permanently delete your account, jobs, and all associated data. This action is irreversible.</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (confirm('Are you absolutely sure? This will delete all your data, jobs, and messages permanently.')) {
+                      setSaving(true);
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+
+                        // 1. Delete user from auth via API (preferred) or purge via DB
+                        const res = await fetch('/api/account/delete', { method: 'POST' });
+                        const result = await res.json();
+                        
+                        if (res.ok) {
+                          toast.success('Account deleted successfully');
+                          await supabase.auth.signOut();
+                          router.push('/');
+                        } else {
+                          // Fallback if API not available: Purge profile (CASCADE will handle the rest)
+                          const { error } = await supabase.from('profiles').delete().eq('id', user.id);
+                          if (error) throw error;
+                          toast.success('Data purged. Logging out...');
+                          await supabase.auth.signOut();
+                          router.push('/');
+                        }
+                      } catch (err) {
+                        toast.error('Failed to delete account');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-error text-white text-sm font-bold hover:bg-error/80 transition-all shadow-lg shadow-error/10 whitespace-nowrap"
+                >
+                  Delete Permanently
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -234,19 +347,3 @@ export default function HirerSettings() {
   )
 }
 
-function Sparkles({ className }: { className?: string }) {
-  return (
-    <svg 
-      className={className} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-      <path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>
-    </svg>
-  )
-}

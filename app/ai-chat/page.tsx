@@ -28,6 +28,7 @@ export default function AIChatPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [extracted, setExtracted] = useState<ExtractedJob | null>(null)
+  const [foundJobs, setFoundJobs] = useState<any[]>([])
   const [showJobCard, setShowJobCard] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [sessionId, setSessionId] = useState<string>('')
@@ -73,6 +74,11 @@ export default function AIChatPage() {
 
         if (data.extracted) {
           setExtracted(data.extracted)
+          setFoundJobs([])
+          setShowJobCard(true)
+        } else if (data.searchParams) {
+          handleSearchJobs(data.searchParams)
+          setExtracted(null)
           setShowJobCard(true)
         }
       }
@@ -81,6 +87,42 @@ export default function AIChatPage() {
     } finally {
       setLoading(false)
       inputRef.current?.focus()
+    }
+  }
+
+  const handleSearchJobs = async (params: { category_slug?: string; city?: string }) => {
+    try {
+      let query = supabase.from('jobs').select('*, categories(*)').eq('status', 'open')
+      
+      if (params.category_slug) {
+        const { data: category } = await supabase.from('categories').select('id').eq('slug', params.category_slug).maybeSingle()
+        if (category) query = query.eq('category_id', category.id)
+      }
+      
+      if (params.city) {
+        query = query.ilike('city', `%${params.city}%`)
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(5)
+      
+      if (error) throw error
+      setFoundJobs(data || [])
+      
+      if (data && data.length > 0) {
+        setMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          role: 'model', 
+          content: `I found ${data.length} jobs that match your criteria. You can view them in the side panel!` 
+        }])
+      } else {
+        setMessages(prev => [...prev, { 
+          id: crypto.randomUUID(), 
+          role: 'model', 
+          content: "I couldn't find any open jobs matching those criteria right now, but you can try a different category or location!" 
+        }])
+      }
+    } catch (err) {
+      toast.error('Failed to search jobs')
     }
   }
 
@@ -311,70 +353,98 @@ export default function AIChatPage() {
         </div>
 
         {/* Job Card Preview — Desktop sidebar / Mobile modal */}
-        {extracted && (
+        {(extracted || foundJobs.length > 0) && (
           <>
             {/* Desktop sidebar */}
             <div className={`${showJobCard ? 'block' : 'hidden'} md:block flex-shrink-0 w-80 border-l border-surface-border bg-surface-card overflow-y-auto`}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-display font-bold text-white">Job Preview</h3>
+                  <h3 className="font-display font-bold text-white">{extracted ? 'Job Preview' : 'Found Jobs'}</h3>
                   <button onClick={() => setShowJobCard(false)} className="md:hidden p-1 rounded-lg hover:bg-surface-hover">
                     <X className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{CATEGORY_ICONS[extracted.category_slug] || '🔧'}</span>
-                    <div>
-                      <div className="font-medium text-white text-sm">{extracted.title}</div>
-                      <div className="text-xs text-muted-foreground capitalize">{extracted.category_slug.replace(/-/g, ' ')}</div>
+                {extracted ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{CATEGORY_ICONS[extracted.category_slug] || '🔧'}</span>
+                      <div>
+                        <div className="font-medium text-white text-sm">{extracted.title}</div>
+                        <div className="text-xs text-muted-foreground capitalize">{extracted.category_slug.replace(/-/g, ' ')}</div>
+                      </div>
                     </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">{extracted.location_text || extracted.city || 'Not specified'}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <IndianRupee className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">
+                          {extracted.budget_min && extracted.budget_max
+                            ? `${formatINR(extracted.budget_min)} - ${formatINR(extracted.budget_max)}`
+                            : extracted.budget_min
+                            ? `From ${formatINR(extracted.budget_min)}`
+                            : 'Negotiable'}
+                          {extracted.budget_type !== 'negotiable' && <span className="text-xs ml-1">/ {extracted.budget_type}</span>}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Clock className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">{extracted.duration || 'Not specified'}</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Briefcase className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">{extracted.requirements || 'No special requirements'}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-surface border border-surface-border">
+                      <div className="text-xs text-muted-foreground mb-1">Description</div>
+                      <div className="text-sm text-foreground">{extracted.description}</div>
+                    </div>
+
+                    <button
+                      onClick={handlePostJob}
+                      disabled={posting || jobPosted}
+                      className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+                    >
+                      {posting ? <>Posting... <Sparkles className="w-4 h-4 animate-spin" /></> : jobPosted ? 'Job Posted!' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
+                    </button>
+
+                    {!user && (
+                      <p className="text-xs text-muted-foreground text-center">You&apos;ll need to sign up to post this job</p>
+                    )}
                   </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground">{extracted.location_text || extracted.city || 'Not specified'}</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <IndianRupee className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground">
-                        {extracted.budget_min && extracted.budget_max
-                          ? `${formatINR(extracted.budget_min)} - ${formatINR(extracted.budget_max)}`
-                          : extracted.budget_min
-                          ? `From ${formatINR(extracted.budget_min)}`
-                          : 'Negotiable'}
-                        {extracted.budget_type !== 'negotiable' && <span className="text-xs ml-1">/ {extracted.budget_type}</span>}
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Clock className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground">{extracted.duration || 'Not specified'}</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Briefcase className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-muted-foreground">{extracted.requirements || 'No special requirements'}</span>
-                    </div>
+                ) : (
+                  <div className="space-y-4">
+                    {foundJobs.map((job) => (
+                      <div key={job.id} className="p-4 rounded-xl bg-surface border border-surface-border hover:border-brand/30 transition-all">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{job.categories?.icon || '🔧'}</span>
+                          <span className="text-xs font-medium text-brand">{job.categories?.name}</span>
+                        </div>
+                        <h4 className="font-bold text-white text-sm mb-1">{job.title}</h4>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                          <MapPin className="w-3 h-3" /> {job.city}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-bold text-white">
+                            {job.budget_min ? formatINR(job.budget_min) : 'Negotiable'}
+                          </div>
+                          <Link
+                            href={`/jobs/${job.id}`}
+                            className="px-3 py-1.5 rounded-lg bg-brand/10 text-brand text-[10px] font-bold hover:bg-brand/20 transition-colors"
+                          >
+                            Apply Now
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-
-                  <div className="p-3 rounded-xl bg-surface border border-surface-border">
-                    <div className="text-xs text-muted-foreground mb-1">Description</div>
-                    <div className="text-sm text-foreground">{extracted.description}</div>
-                  </div>
-
-                  <button
-                    onClick={handlePostJob}
-                    disabled={posting || jobPosted}
-                    className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
-                  >
-                    {posting ? <>Posting... <Sparkles className="w-4 h-4 animate-spin" /></> : jobPosted ? 'Job Posted!' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
-                  </button>
-
-                  {!user && (
-                    <p className="text-xs text-muted-foreground text-center">You&apos;ll need to sign up to post this job</p>
-                  )}
-                </div>
+                )}
               </div>
             </div>
 
@@ -383,45 +453,63 @@ export default function AIChatPage() {
               <div className="md:hidden fixed inset-0 z-50 bg-black/60 flex items-end" onClick={() => setShowJobCard(false)}>
                 <div className="w-full bg-surface-card rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display font-bold text-white">Job Preview</h3>
+                    <h3 className="font-display font-bold text-white">{extracted ? 'Job Preview' : 'Found Jobs'}</h3>
                     <button onClick={() => setShowJobCard(false)} className="p-1 rounded-lg hover:bg-surface-hover">
                       <X className="w-4 h-4 text-muted-foreground" />
                     </button>
                   </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{CATEGORY_ICONS[extracted.category_slug] || '🔧'}</span>
-                      <div>
-                        <div className="font-medium text-white">{extracted.title}</div>
-                        <div className="text-xs text-muted-foreground capitalize">{extracted.category_slug.replace(/-/g, ' ')}</div>
+                  
+                  {extracted ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{CATEGORY_ICONS[extracted.category_slug] || '🔧'}</span>
+                        <div>
+                          <div className="font-medium text-white">{extracted.title}</div>
+                          <div className="text-xs text-muted-foreground capitalize">{extracted.category_slug.replace(/-/g, ' ')}</div>
+                        </div>
                       </div>
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-brand mt-0.5" />
+                          <span className="text-sm text-muted-foreground">{extracted.location_text || extracted.city || 'Not specified'}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <IndianRupee className="w-4 h-4 text-brand mt-0.5" />
+                          <span className="text-sm text-muted-foreground">
+                            {extracted.budget_min && extracted.budget_max
+                              ? `${formatINR(extracted.budget_min)} - ${formatINR(extracted.budget_max)}`
+                              : 'Negotiable'}
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Clock className="w-4 h-4 text-brand mt-0.5" />
+                          <span className="text-sm text-muted-foreground">{extracted.duration || 'Not specified'}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handlePostJob}
+                        disabled={posting || jobPosted}
+                        className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+                      >
+                        {posting ? <>Posting... <Sparkles className="w-4 h-4 animate-spin" /></> : jobPosted ? 'Job Posted!' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
+                      </button>
                     </div>
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-brand mt-0.5" />
-                        <span className="text-sm text-muted-foreground">{extracted.location_text || extracted.city || 'Not specified'}</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <IndianRupee className="w-4 h-4 text-brand mt-0.5" />
-                        <span className="text-sm text-muted-foreground">
-                          {extracted.budget_min && extracted.budget_max
-                            ? `${formatINR(extracted.budget_min)} - ${formatINR(extracted.budget_max)}`
-                            : 'Negotiable'}
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Clock className="w-4 h-4 text-brand mt-0.5" />
-                        <span className="text-sm text-muted-foreground">{extracted.duration || 'Not specified'}</span>
-                      </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {foundJobs.map((job) => (
+                        <div key={job.id} className="p-4 rounded-xl bg-surface border border-surface-border">
+                          <h4 className="font-bold text-white text-sm mb-1">{job.title}</h4>
+                          <p className="text-xs text-muted-foreground mb-3">{job.city}</p>
+                          <Link
+                            href={`/jobs/${job.id}`}
+                            className="w-full py-2 rounded-lg bg-brand text-white text-xs font-bold flex items-center justify-center"
+                          >
+                            View & Apply
+                          </Link>
+                        </div>
+                      ))}
                     </div>
-                    <button
-                      onClick={handlePostJob}
-                      disabled={posting || jobPosted}
-                      className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
-                    >
-                      {posting ? <>Posting... <Sparkles className="w-4 h-4 animate-spin" /></> : jobPosted ? 'Job Posted!' : <>Post This Job <ArrowRight className="w-4 h-4" /></>}
-                    </button>
-                  </div>
+                  )}
                 </div>
               </div>
             )}

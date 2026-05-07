@@ -22,30 +22,34 @@ export interface ExtractedJob {
 }
 
 const JOB_INTAKE_SYSTEM = `You are GigMind's AI assistant for India's service marketplace.
-Help users describe their service requirement clearly.
+Help users either POST a service requirement or FIND/APPLY to existing jobs.
 
 Available categories: real-estate, medical, home-repair, office-assistance,
 interior-design, security, human-resources, cleaning, transport, education,
 event-management, it-services
 
-Extract through conversation: service type, location (city), budget (INR),
-timeline, duration, special requirements.
+INTENTS:
+1. POST JOB: If user wants a service. Extract: title, category, city, budget, etc.
+   End with: EXTRACTED:{"title":"...","category_slug":"...","description":"...","location_text":"...","city":"...","budget_min":null,"budget_max":null,"budget_type":"negotiable","duration":"...","requirements":"...","start_date":null}
 
-Ask ONE question at a time. Be friendly. Support Hinglish (Hindi+English mix).
-Keep replies under 80 words.
+2. FIND JOB: If user wants to work or apply. Extract: category_slug, city.
+   End with: SEARCH_JOBS:{"category_slug":"...","city":"..."}
 
-When you have enough info (at minimum: category + location + rough budget), end with:
-EXTRACTED:{"title":"...","category_slug":"...","description":"...","location_text":"...","city":"...","budget_min":null,"budget_max":null,"budget_type":"negotiable","duration":"...","requirements":"...","start_date":null}
-
-Only include the EXTRACTED: line when you have sufficient info to create a job posting.`
+Ask ONE question at a time. Support Hinglish. Keep replies under 80 words.
+Only include the EXTRACTED: or SEARCH_JOBS: line when you have sufficient info.`
 
 export async function jobIntakeChat(
   history: ChatMessage[],
   userMessage: string
-): Promise<{ reply: string; extracted: ExtractedJob | null; isComplete: boolean }> {
+): Promise<{ 
+  reply: string; 
+  extracted: ExtractedJob | null; 
+  searchParams: { category_slug?: string; city?: string } | null;
+  isComplete: boolean 
+}> {
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
     { role: 'user', content: JOB_INTAKE_SYSTEM },
-    { role: 'assistant', content: 'Namaste! I am GigMind AI. Tell me what service you need and I will help you find the right professional. Aap Hindi ya English mein bhi baat kar sakte hain!' },
+    { role: 'assistant', content: 'Namaste! I am GigMind AI. Tell me what service you need or if you are looking for work, I can help you find jobs. Aap Hindi ya English mein bhi baat kar sakte hain!' },
     ...history.map(m => ({ role: m.role === 'model' ? 'assistant' as const : 'user' as const, content: m.content })),
     { role: 'user', content: userMessage },
   ]
@@ -60,6 +64,7 @@ export async function jobIntakeChat(
   const fullText = completion.choices[0]?.message?.content || ''
 
   let extracted: ExtractedJob | null = null
+  let searchParams: { category_slug?: string; city?: string } | null = null
   let isComplete = false
 
   if (fullText.includes('EXTRACTED:')) {
@@ -67,14 +72,19 @@ export async function jobIntakeChat(
       const jsonStr = fullText.split('EXTRACTED:')[1].trim()
       extracted = JSON.parse(jsonStr)
       isComplete = true
-    } catch {
-      // JSON parse failed, return reply without extraction
-    }
+    } catch { }
+  } else if (fullText.includes('SEARCH_JOBS:')) {
+    try {
+      const jsonStr = fullText.split('SEARCH_JOBS:')[1].trim()
+      searchParams = JSON.parse(jsonStr)
+      isComplete = true
+    } catch { }
   }
 
   return {
-    reply: fullText.split('EXTRACTED:')[0].trim(),
+    reply: fullText.split('EXTRACTED:')[0].split('SEARCH_JOBS:')[0].trim(),
     extracted,
+    searchParams,
     isComplete,
   }
 }

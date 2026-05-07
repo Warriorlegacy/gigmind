@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userMessage is required' }, { status: 400 })
     }
 
-    const { reply, extracted, isComplete } = await jobIntakeChat(messages || [], userMessage)
+    const { reply, extracted, searchParams, isComplete } = await jobIntakeChat(messages || [], userMessage)
 
     if (sessionId && user) {
       const updatedMessages = [
@@ -32,13 +32,13 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         session_type: 'job_intake',
         messages: updatedMessages,
-        extracted_data: extracted,
+        extracted_data: extracted || searchParams,
         status: isComplete ? 'completed' : 'active',
         updated_at: new Date().toISOString(),
       })
     }
 
-    return NextResponse.json({ reply, extracted, isComplete })
+    return NextResponse.json({ reply, extracted, searchParams, isComplete })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'AI service unavailable'
     return NextResponse.json({ error: message }, { status: 503 })
