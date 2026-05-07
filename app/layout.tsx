@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
   title: 'GigMind — Hire Anything. Chat Everything.',
@@ -29,6 +30,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-surface text-foreground font-sans antialiased">
         {children}
+        <Toaster />
       </body>
     </html>
   )
