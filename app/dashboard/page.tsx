@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
 import { Briefcase, IndianRupee, MessageSquare, Plus, TrendingUp, Star, ArrowRight, Clock, Users, Sparkles, Crown, Trash2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
+import { DashboardAnalytics } from '@/components/shared/DashboardAnalytics'
 
 interface Profile {
   id: string
@@ -339,7 +340,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Messaging Quick Link */}
+          {/* Messaging Quick Link */}
             <div className="p-6 rounded-2xl bg-surface-card border border-surface-border hover:border-brand/30 transition-all group">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand group-hover:scale-110 transition-transform">
@@ -357,6 +358,11 @@ export default function DashboardPage() {
                 Go to Inbox <ArrowRight className="w-4 h-4 text-muted-foreground" />
               </Link>
             </div>
+          </div>
+
+          {/* Graphify Section (Performance Analytics) */}
+          <div className="mb-12">
+            <DashboardAnalytics />
           </div>
 
           {/* Stats Cards */}
