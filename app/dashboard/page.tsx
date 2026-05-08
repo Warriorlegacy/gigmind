@@ -204,7 +204,7 @@ export default function DashboardPage() {
         toast(
           <div className="flex flex-col gap-2 p-1">
             <p className="font-medium text-white">You have a pending job draft:</p>
-            <p className="text-sm text-muted-foreground line-clamp-2">"{pendingJob.title}"</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">&ldquo;{pendingJob.title}&rdquo;</p>
             <div className="flex gap-2 mt-2">
               <button
                 onClick={() => router.push('/ai-chat')}
@@ -513,7 +513,7 @@ export default function DashboardPage() {
                   ) : (
                     <div className="text-center py-8">
                       <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-muted-foreground text-sm mb-3">You haven't applied to any jobs yet</p>
+                      <p className="text-muted-foreground text-sm mb-3">You haven&apos;t applied to any jobs yet</p>
                       <Link href="/jobs" className="text-brand text-sm font-medium hover:underline">Browse Jobs</Link>
                     </div>
                   )}

@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { formatINR } from '@/lib/utils/formatting'
 import { Search, MapPin, Star, Shield, MessageSquare, Eye, Filter } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 interface Provider {
   id: string
@@ -40,6 +43,10 @@ const RATING_FILTERS = [
   { value: '4.5', label: '4.5+' },
 ]
 
+const INDIAN_CITIES = [
+  'All Cities', 'Delhi', 'Mumbai', 'Bangalore', 'Lucknow', 'Kanpur', 'Jaipur', 'Hyderabad', 'Pune', 'Ahmedabad', 'Bhopal', 'Nagpur', 'Indore', 'Patna', 'Varanasi', 'Agra', 'Allahabad', 'Meerut', 'Ghaziabad', 'Noida', 'Gurugram',
+]
+
 export default function ProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,16 +55,18 @@ export default function ProvidersPage() {
   const [city, setCity] = useState('')
   const [minRating, setMinRating] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
     fetchProviders()
-  }, [category, minRating])
+  }, [category, minRating, city])
 
   const fetchProviders = async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (category) params.set('category', category)
-    if (city) params.set('city', city)
+    if (city && city !== 'All Cities') params.set('city', city)
     if (minRating) params.set('min_rating', minRating)
     if (search) params.set('search', search)
 
@@ -70,6 +79,59 @@ export default function ProvidersPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     fetchProviders()
+  }
+
+  const handleMessageProvider = async (provider: Provider) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login?redirect=/providers')
+      return
+    }
+
+    const providerUserId = provider.profiles ? await supabase
+      .from('provider_profiles')
+      .select('user_id')
+      .eq('id', provider.id)
+      .maybeSingle()
+      .then(({ data }) => data?.user_id as string | undefined)
+      : undefined
+
+    if (!providerUserId) {
+      toast.error('Provider profile is not available for messaging.')
+      return
+    }
+
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('hirer_id', user.id)
+      .eq('provider_id', providerUserId)
+      .is('job_id', null)
+      .maybeSingle()
+
+    if (existing?.id) {
+      router.push(`/messages?id=${existing.id}`)
+      return
+    }
+
+    const { data: created, error } = await supabase
+      .from('conversations')
+      .insert({
+        hirer_id: user.id,
+        provider_id: providerUserId,
+        job_id: null,
+        last_message: 'Conversation started',
+        last_message_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+
+    router.push(`/messages?id=${created.id}`)
   }
 
   const renderStars = (rating: number) => {
@@ -139,23 +201,9 @@ export default function ProvidersPage() {
                     className="w-full px-3 py-2 rounded-lg bg-surface border border-surface-border text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
                   >
                     <option value="">All Cities</option>
-                    <optgroup label="Metros">
-                      <option value="Delhi">Delhi / NCR</option>
-                      <option value="Mumbai">Mumbai</option>
-                      <option value="Bangalore">Bangalore</option>
-                      <option value="Hyderabad">Hyderabad</option>
-                      <option value="Chennai">Chennai</option>
-                      <option value="Kolkata">Kolkata</option>
-                    </optgroup>
-                    <optgroup label="Major Cities">
-                      <option value="Lucknow">Lucknow</option>
-                      <option value="Kanpur">Kanpur</option>
-                      <option value="Pune">Pune</option>
-                      <option value="Ahmedabad">Ahmedabad</option>
-                      <option value="Jaipur">Jaipur</option>
-                      <option value="Chandigarh">Chandigarh</option>
-                      <option value="Indore">Indore</option>
-                    </optgroup>
+                    {INDIAN_CITIES.filter((cityOption) => cityOption !== 'All Cities').map((cityOption) => (
+                      <option key={cityOption} value={cityOption}>{cityOption}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -202,8 +250,11 @@ export default function ProvidersPage() {
               <div className="w-16 h-16 rounded-2xl bg-surface-card flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-display text-lg font-bold text-white mb-2">No providers found</h3>
-              <p className="text-muted-foreground text-sm">Try adjusting your filters</p>
+              <h3 className="font-display text-lg font-bold text-white mb-2">No providers yet{category ? ` in ${CATEGORY_TABS.find((tab) => tab.slug === category)?.name || category}` : ''}.</h3>
+              <p className="text-muted-foreground text-sm mb-6">Be the first to offer this service on GigMind.</p>
+              <Link href="/settings/provider" className="px-6 py-3 rounded-xl bg-brand-gradient text-white font-medium inline-flex items-center gap-2">
+                Join as Provider
+              </Link>
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -256,12 +307,13 @@ export default function ProvidersPage() {
                     >
                       <Eye className="w-3.5 h-3.5" /> View
                     </Link>
-                    <Link
-                      href={`/messages?provider=${provider.id}`}
+                    <button
+                      type="button"
+                      onClick={() => handleMessageProvider(provider)}
                       className="flex-1 py-2 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 transition-colors text-xs font-medium text-center flex items-center justify-center gap-1"
                     >
                       <MessageSquare className="w-3.5 h-3.5" /> Message
-                    </Link>
+                    </button>
                   </div>
                 </div>
               ))}

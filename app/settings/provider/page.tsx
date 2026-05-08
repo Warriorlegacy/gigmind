@@ -27,13 +27,13 @@ const CATEGORIES = [
 ]
 
 const STEPS = [
-  { id: 1, title: 'Basic Info' },
-  { id: 2, title: 'AI Bio Generator' },
-  { id: 3, title: 'Skills & Categories' },
-  { id: 4, title: 'Rate Card' },
+  { id: 1, title: 'Basics' },
+  { id: 2, title: 'Bio' },
+  { id: 3, title: 'Skills' },
+  { id: 4, title: 'Rates' },
   { id: 5, title: 'Portfolio' },
-  { id: 6, title: 'Location & Radius' },
-  { id: 7, title: 'Account Security' },
+  { id: 6, title: 'Location' },
+  { id: 7, title: 'Security' },
 ]
 
 export default function ProviderSettingsPage() {
@@ -416,7 +416,10 @@ export default function ProviderSettingsPage() {
           <p className="text-muted-foreground text-sm mb-8">Complete your profile to start receiving job matches</p>
 
           {/* Step Indicator */}
-          <div className="flex items-center gap-2 mb-8 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="relative mb-8 -mx-4 sm:mx-0">
+          <div className="pointer-events-none absolute left-0 top-0 bottom-2 w-8 bg-gradient-to-r from-surface to-transparent z-10" />
+          <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-surface to-transparent z-10" />
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-2 px-4 sm:px-0">
             {STEPS.map((s) => (
               <button
                 key={s.id}
@@ -428,9 +431,10 @@ export default function ProviderSettingsPage() {
                 }`}
               >
                 {step > s.id ? <CheckCircle className="w-3.5 h-3.5" /> : <span className="w-4 h-4 rounded-full bg-surface-card border border-inherit flex items-center justify-center text-[8px]">{s.id}</span>}
-                {s.title.split(' ')[0]}
+                {s.title}
               </button>
             ))}
+          </div>
           </div>
 
           {/* Step Content */}
@@ -458,18 +462,21 @@ export default function ProviderSettingsPage() {
                   <input
                     type="text"
                     value={tagline}
-                    onChange={(e) => setTagline(e.target.value)}
+                    maxLength={120}
+                    onChange={(e) => setTagline(e.target.value.slice(0, 120))}
                     placeholder="e.g. Expert Plumber with 10+ Years Experience"
                     className="w-full px-4 py-3 rounded-xl bg-surface border border-surface-border text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                   />
+                  <div className="mt-1 text-right text-[11px] text-muted-foreground">{tagline.length}/120</div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Experience (years)</label>
                   <input
                     type="number"
-                    min="0"
+                    min="1"
+                    max="60"
                     value={experienceYears}
-                    onChange={(e) => setExperienceYears(Math.max(0, parseInt(e.target.value) || 0))}
+                    onChange={(e) => setExperienceYears(Math.min(60, Math.max(1, parseInt(e.target.value) || 1)))}
                     className="w-full px-4 py-3 rounded-xl bg-surface border border-surface-border text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                   />
                 </div>

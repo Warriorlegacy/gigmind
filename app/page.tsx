@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Navigation from '@/components/shared/Navigation'
 import { MessageSquare, Search, Handshake, ArrowRight, Star, Shield, Zap } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
 
 const CATEGORIES = [
   { slug: 'real-estate', name: 'Real Estate', hindi: 'रियल एस्टेट', icon: '🏠' },
@@ -58,7 +59,19 @@ const STEPS = [
 
 import Logo from '@/components/shared/Logo'
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = await createClient()
+  const [jobsCount, providersCount] = await Promise.all([
+    supabase.from('jobs').select('id', { count: 'exact', head: true }),
+    supabase.from('provider_profiles').select('id', { count: 'exact', head: true }),
+  ])
+
+  const stats = [
+    { value: jobsCount.count ? `${jobsCount.count}+` : '100+', label: 'Jobs Posted' },
+    { value: providersCount.count ? `${providersCount.count}+` : '50+', label: 'Verified Providers' },
+    { value: 'AI', label: 'Powered Matching' },
+  ]
+
   return (
     <div className="min-h-screen bg-surface">
       <Navigation />
@@ -100,11 +113,7 @@ export default function LandingPage() {
       {/* Stats */}
       <section className="py-8 px-4 border-y border-surface-border">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-8 sm:gap-16">
-          {[
-            { value: '12+', label: 'Service Categories' },
-            { value: '₹0', label: 'Platform Fee to Browse' },
-            { value: 'AI', label: 'Powered Matching' },
-          ].map((stat) => (
+          {stats.map((stat) => (
             <div key={stat.label} className="text-center">
               <div className="font-display text-2xl sm:text-3xl font-bold text-white">{stat.value}</div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>

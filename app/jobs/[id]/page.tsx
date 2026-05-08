@@ -40,6 +40,7 @@ export default function JobDetailPage() {
   const [proposedAmount, setProposedAmount] = useState('')
   const [proposedTimeline, setProposedTimeline] = useState('')
   const [generatingAI, setGeneratingAI] = useState(false)
+  const [aiGenerated, setAiGenerated] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [user, setUser] = useState<any>(null)
@@ -138,9 +139,12 @@ export default function JobDetailPage() {
         }),
       })
       const data = await res.json()
-      if (data.proposal) setCoverLetter(data.proposal)
+      if (data.proposal) {
+        setCoverLetter(data.proposal)
+        setAiGenerated(true)
+      }
     } catch {
-      // fallback: keep existing cover letter
+      toast.error('AI proposal generation failed. Please try again.')
     }
     setGeneratingAI(false)
   }
@@ -152,15 +156,19 @@ export default function JobDetailPage() {
     }
     setSubmitting(true)
     try {
-      const { error } = await supabase.from('applications').insert({
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
         job_id: id,
-        applicant_id: user.id,
         cover_letter: coverLetter,
         proposed_amount: proposedAmount ? parseFloat(proposedAmount) : null,
         proposed_timeline: proposedTimeline,
+        }),
       })
 
-      if (error) throw error
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to submit application')
 
       // Notify the hirer
       if (job?.profiles?.id) {
@@ -351,7 +359,7 @@ export default function JobDetailPage() {
                               </div>
                             </div>
                             <div className="text-sm text-muted-foreground bg-surface-card/50 p-4 rounded-xl border border-surface-border/50 italic mb-4">
-                              "{app.cover_letter}"
+                              &ldquo;{app.cover_letter}&rdquo;
                             </div>
                             <div className="flex gap-3">
                               <button className="flex-1 py-2 rounded-lg bg-brand text-white text-xs font-medium hover:bg-brand-dark transition-colors">Hire Now</button>
@@ -445,21 +453,23 @@ export default function JobDetailPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-2">Cover Letter</label>
-                <div className="relative">
-                  <textarea
-                    value={coverLetter}
-                    onChange={(e) => setCoverLetter(e.target.value)}
-                    rows={5}
-                    className="w-full px-4 py-3 rounded-xl bg-surface border border-surface-border text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all resize-none text-sm"
-                    placeholder="Why are you the best fit for this job?"
-                  />
+                <textarea
+                  value={coverLetter}
+                  onChange={(e) => setCoverLetter(e.target.value)}
+                  rows={5}
+                  minLength={50}
+                  className="w-full px-4 py-3 rounded-xl bg-surface border border-surface-border text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all resize-none text-sm"
+                  placeholder="Why are you the best fit for this job?"
+                />
+                <div className="mt-2 flex items-center justify-between gap-3">
                   <button
                     onClick={generateAIProposal}
                     disabled={generatingAI}
-                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-brand/10 text-brand text-xs font-medium hover:bg-brand/20 transition-colors flex items-center gap-1 disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg bg-brand/10 text-brand text-xs font-medium hover:bg-brand/20 transition-colors flex items-center gap-1 disabled:opacity-50"
                   >
-                    <Sparkles className="w-3 h-3" /> {generatingAI ? 'Generating...' : 'AI Generate'}
+                    <Sparkles className={`w-3 h-3 ${generatingAI ? 'animate-spin' : ''}`} /> {generatingAI ? 'Generating...' : aiGenerated ? 'Generated! Edit if needed' : 'Generate with AI'}
                   </button>
+                  <span className={`text-xs ${coverLetter.length >= 50 ? 'text-success' : 'text-muted-foreground'}`}>{coverLetter.length}/50 min</span>
                 </div>
               </div>
 

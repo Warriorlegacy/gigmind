@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sanitizeInput } from '@/lib/sanitize'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -25,7 +26,10 @@ export async function GET(request: NextRequest) {
   if (city) query = query.ilike('city', `%${city}%`)
   if (budgetMin) query = query.gte('budget_max', parseFloat(budgetMin))
   if (budgetMax) query = query.lte('budget_min', parseFloat(budgetMax))
-  if (search) query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`)
+  if (search) {
+    const safeSearch = sanitizeInput(search)
+    query = query.or(`title.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`)
+  }
 
   const { data: jobs, count, error } = await query
 
@@ -61,16 +65,16 @@ export async function POST(request: NextRequest) {
     .from('jobs')
     .insert({
       hirer_id: user.id,
-      title,
-      description,
+      title: sanitizeInput(title),
+      description: sanitizeInput(description),
       category_id,
-      location_text: location_text || '',
-      city: city || '',
+      location_text: sanitizeInput(location_text || ''),
+      city: sanitizeInput(city || ''),
       budget_min: budget_min || null,
       budget_max: budget_max || null,
       budget_type: budget_type || 'negotiable',
-      duration: duration || null,
-      requirements: requirements || null,
+      duration: duration ? sanitizeInput(duration) : null,
+      requirements: requirements ? sanitizeInput(requirements) : null,
       start_date: start_date || null,
       ai_extracted_data: ai_extracted_data || null,
       status: 'open',
@@ -82,5 +86,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ data: job }, { status: 201 })
+  const { data: matches } = await supabase
+    .from('provider_profiles')
+    .select('id, user_id, avg_rating, rate_daily, profiles(full_name, avatar_url, city), provider_categories!inner(category_id)')
+    .eq('provider_categories.category_id', category_id)
+    .eq('availability', 'immediate')
+    .ilike('profiles.city', city ? `%${sanitizeInput(city)}%` : '%')
+    .order('avg_rating', { ascending: false })
+    .limit(10)
+
+  if (matches && matches.length > 0) {
+    await supabase.from('notifications').insert(
+      matches.map((provider: any) => ({
+        user_id: provider.user_id,
+        type: 'job_match',
+        title: 'New matching job',
+        body: `A new ${job.categories?.name || 'service'} job is available in ${sanitizeInput(city || 'your area')}.`,
+        data: { job_id: job.id },
+      }))
+    )
+  }
+
+  return NextResponse.json({ data: job, matches: (matches || []).slice(0, 3) }, { status: 201 })
 }

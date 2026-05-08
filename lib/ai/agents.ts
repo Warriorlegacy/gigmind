@@ -1,6 +1,14 @@
 import Groq from 'groq-sdk'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+let groqClient: Groq | null = null
+
+function getGroq() {
+  if (!groqClient) {
+    groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  }
+
+  return groqClient
+}
 
 export interface ChatMessage {
   role: 'user' | 'model'
@@ -54,7 +62,7 @@ export async function jobIntakeChat(
     { role: 'user', content: userMessage },
   ]
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     messages,
     model: 'llama-3.1-8b-instant',
     max_tokens: 500,
@@ -99,7 +107,7 @@ Paragraph 1: Introduction + experience
 Paragraph 2: Skills and specializations
 Paragraph 3: Work style + why clients should hire them`
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
     model: 'llama-3.1-8b-instant',
     max_tokens: 400,
@@ -126,7 +134,7 @@ Proposed: ₹${amount}, Timeline: ${timeline}
 Be specific, professional, first person. Show understanding of the job,
 highlight relevant experience, mention the amount naturally, end with clear call to action.`
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
     model: 'llama-3.1-8b-instant',
     max_tokens: 300,

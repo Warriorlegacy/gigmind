@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sanitizeInput } from '@/lib/sanitize'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     .range(from, from + limit - 1)
 
   if (minRating) query = query.gte('avg_rating', parseFloat(minRating))
-  if (city) query = query.ilike('profiles.city', `%${city}%`)
+  if (city) query = query.ilike('profiles.city', `%${sanitizeInput(city)}%`)
 
   const { data: providers, count, error } = await query
 
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (search) {
-    const s = search.toLowerCase()
+    const s = sanitizeInput(search).toLowerCase()
     filtered = filtered.filter((p: any) =>
       p.profiles?.full_name?.toLowerCase().includes(s) ||
       p.tagline?.toLowerCase().includes(s) ||

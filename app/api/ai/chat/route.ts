@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { jobIntakeChat, type ChatMessage } from '@/lib/ai/agents'
+import { rateLimit } from '@/lib/rateLimit'
+import { sanitizeInput } from '@/lib/sanitize'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    const clientKey = user?.id || request.headers.get('x-forwarded-for') || 'anonymous'
+
+    if (!rateLimit(`ai-chat:${clientKey}`, 20, 60 * 1000)) {
+      return NextResponse.json({ error: 'Too many requests. Wait 1 minute.' }, { status: 429 })
+    }
 
     const body = await request.json()
     const { messages, userMessage, sessionId } = body as {
@@ -18,12 +25,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userMessage is required' }, { status: 400 })
     }
 
-    const { reply, extracted, searchParams, isComplete } = await jobIntakeChat(messages || [], userMessage)
+    const sanitizedMessage = sanitizeInput(userMessage)
+    const sanitizedHistory = (messages || []).map((message) => ({
+      role: message.role,
+      content: sanitizeInput(message.content),
+    }))
+
+    const { reply, extracted, searchParams, isComplete } = await jobIntakeChat(sanitizedHistory, sanitizedMessage)
 
     if (sessionId && user) {
       const updatedMessages = [
         ...(messages || []),
-        { role: 'user' as const, content: userMessage },
+        { role: 'user' as const, content: sanitizedMessage },
         { role: 'model' as const, content: reply },
       ]
 

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://gigmind-gamma.vercel.app'),
   title: 'GigMind — Hire Anything. Chat Everything.',
   description: 'AI-powered multi-service marketplace for India. Hire real estate, medical, home repair, security, interior design, HR services and more — just chat with AI.',
   manifest: '/manifest.json',
@@ -12,6 +13,16 @@ export const metadata: Metadata = {
     title: 'GigMind — Hire Anything. Chat Everything.',
     description: 'AI-powered service marketplace for India',
     type: 'website',
+    images: [{
+      url: '/og-image.png',
+      width: 1200,
+      height: 630,
+      alt: 'GigMind — Hire Anything. Chat Everything.',
+    }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og-image.png'],
   },
 }
 

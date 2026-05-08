@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
 import { Search, MapPin, IndianRupee, Clock, Users, Filter, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
@@ -38,13 +38,18 @@ const CATEGORIES = [
   { slug: 'it-services', name: 'IT' },
 ]
 
+const INDIAN_CITIES = [
+  'All Cities', 'Lucknow', 'Kanpur', 'Varanasi', 'Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Jaipur',
+]
+
 export default function JobsPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState(searchParams.get('category') || '')
-  const [city, setCity] = useState('')
+  const [city, setCity] = useState(searchParams.get('city') || 'All Cities')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
@@ -57,7 +62,7 @@ export default function JobsPage() {
     setLoading(true)
     const params = new URLSearchParams()
     if (category) params.set('category', category)
-    if (city) params.set('city', city)
+    if (city && city !== 'All Cities') params.set('city', city)
     if (search) params.set('search', search)
     params.set('page', page.toString())
     params.set('limit', '10')
@@ -67,6 +72,12 @@ export default function JobsPage() {
     setJobs(data.data || [])
     setTotalPages(data.totalPages || 1)
     setLoading(false)
+    const nextUrl = new URLSearchParams(searchParams.toString())
+    if (city && city !== 'All Cities') nextUrl.set('city', city)
+    else nextUrl.delete('city')
+    if (category) nextUrl.set('category', category)
+    else nextUrl.delete('category')
+    router.replace(`/jobs${nextUrl.toString() ? `?${nextUrl.toString()}` : ''}`, { scroll: false })
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -123,7 +134,7 @@ export default function JobsPage() {
             <div className="p-4 rounded-xl bg-surface-card border border-surface-border mb-6 animate-fade-in">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-medium text-white text-sm">Filters</h3>
-                <button onClick={() => { setCategory(''); setCity(''); }} className="text-xs text-brand hover:text-brand-light">Clear All</button>
+                <button onClick={() => { setCategory(''); setCity('All Cities'); }} className="text-xs text-brand hover:text-brand-light">Clear All</button>
               </div>
               <div className="space-y-3">
                 <div>
@@ -151,34 +162,23 @@ export default function JobsPage() {
                     onChange={(e) => { setCity(e.target.value); setPage(1) }}
                     className="w-full px-3 py-2 rounded-lg bg-surface border border-surface-border text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
                   >
-                    <option value="">All Cities</option>
-                    <optgroup label="Metros">
-                      <option value="Delhi">Delhi / NCR</option>
-                      <option value="Mumbai">Mumbai</option>
-                      <option value="Bangalore">Bangalore</option>
-                      <option value="Hyderabad">Hyderabad</option>
-                      <option value="Chennai">Chennai</option>
-                      <option value="Kolkata">Kolkata</option>
-                    </optgroup>
-                    <optgroup label="Major Cities">
-                      <option value="Lucknow">Lucknow</option>
-                      <option value="Kanpur">Kanpur</option>
-                      <option value="Pune">Pune</option>
-                      <option value="Ahmedabad">Ahmedabad</option>
-                      <option value="Jaipur">Jaipur</option>
-                      <option value="Chandigarh">Chandigarh</option>
-                      <option value="Indore">Indore</option>
-                    </optgroup>
+                    {INDIAN_CITIES.map((cityOption) => (
+                      <option key={cityOption} value={cityOption}>{cityOption}</option>
+                    ))}
                   </select>
                 </div>
               </div>
             </div>
           )}
 
+          <div className="mb-4 inline-flex items-center rounded-full bg-brand/10 border border-brand/20 px-3 py-1 text-xs font-medium text-brand">
+            Showing {jobs.length} jobs{city !== 'All Cities' ? ` in ${city}` : ''}
+          </div>
+
           {/* Job Cards */}
           {loading ? (
             <div className="space-y-4">
-              {Array.from({ length: 4 }).map((_, i) => (
+              {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="p-6 rounded-2xl bg-surface-card border border-surface-border animate-pulse">
                   <div className="h-5 bg-surface-hover rounded w-3/4 mb-3" />
                   <div className="h-4 bg-surface-hover rounded w-1/2 mb-4" />
@@ -194,8 +194,8 @@ export default function JobsPage() {
               <div className="w-16 h-16 rounded-2xl bg-surface-card flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-display text-lg font-bold text-white mb-2">No jobs found</h3>
-              <p className="text-muted-foreground text-sm mb-6">Try adjusting your filters or search terms</p>
+              <h3 className="font-display text-lg font-bold text-white mb-2">No jobs posted yet{city !== 'All Cities' ? ` in ${city}` : ''}</h3>
+              <p className="text-muted-foreground text-sm mb-6">Be the first to post a job and get matched with trusted providers.</p>
               <Link href="/ai-chat" className="px-6 py-3 rounded-xl bg-brand-gradient text-white font-medium inline-flex items-center gap-2">
                 Post a Job <Plus className="w-4 h-4" />
               </Link>

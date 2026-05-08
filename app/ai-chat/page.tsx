@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatting'
-import { Send, Bot, User, MapPin, Briefcase, IndianRupee, Clock, X, ArrowRight, Sparkles, ArrowLeft, Users } from 'lucide-react'
+import { Send, Bot, User, MapPin, Briefcase, IndianRupee, Clock, X, ArrowRight, Sparkles, ArrowLeft, Mic } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ExtractedJob } from '@/lib/ai/agents'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -16,6 +16,23 @@ interface Message {
   role: 'user' | 'model'
   content: string
 }
+
+type BrowserSpeechRecognition = {
+  lang: string
+  interimResults: boolean
+  continuous: boolean
+  start: () => void
+  stop: () => void
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+}
+
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>
+}
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition
 
 const CATEGORY_ICONS: Record<string, string> = {
   'real-estate': '🏠', 'medical': '🏥', 'home-repair': '🔧', 'office-assistance': '🏢',
@@ -34,14 +51,33 @@ export default function AIChatPage() {
   const [sessionId, setSessionId] = useState<string>('')
   const [posting, setPosting] = useState(false)
   const [jobPosted, setJobPosted] = useState(false)
+  const [voiceSupported, setVoiceSupported] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+      if (user) {
+        const pendingJob = sessionStorage.getItem('gigmind_pending_job')
+        if (pendingJob) {
+          try {
+            setExtracted(JSON.parse(pendingJob) as ExtractedJob)
+            setShowJobCard(true)
+            sessionStorage.removeItem('gigmind_pending_job')
+            toast.success('Your draft job is restored.')
+          } catch {
+            sessionStorage.removeItem('gigmind_pending_job')
+          }
+        }
+      }
+    })
     setSessionId(crypto.randomUUID())
+    setVoiceSupported('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
   }, [])
 
   useEffect(() => {
@@ -129,9 +165,9 @@ export default function AIChatPage() {
   const handlePostJob = async () => {
     if (!user) {
       if (extracted) {
-        localStorage.setItem('gigmind_pending_job', JSON.stringify(extracted))
+        sessionStorage.setItem('gigmind_pending_job', JSON.stringify(extracted))
       }
-      router.push('/signup')
+      router.push('/login?redirect=/ai-chat')
       return
     }
 
@@ -173,10 +209,10 @@ export default function AIChatPage() {
         }
       }
 
-      const { data: job, error } = await supabase
-        .from('jobs')
-        .insert({
-          hirer_id: user.id,
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           category_id: category.id,
           title: extracted.title || 'Service Request',
           description: extracted.description || 'Details not provided.',
@@ -189,20 +225,19 @@ export default function AIChatPage() {
           requirements: extracted.requirements || '',
           start_date: safeStartDate,
           ai_extracted_data: extracted,
-          status: 'open',
-        })
-        .select('id')
-        .single()
+        }),
+      })
+      const result = await res.json()
 
-      if (error) {
-        toast.error(`Failed to post job: ${error.message}`)
+      if (!res.ok) {
+        toast.error(`Failed to post job: ${result.error || 'Please try again'}`)
         setJobPosted(false)
         return
       }
 
-      if (job) {
-        toast.success('Job posted successfully!')
-        router.push(`/jobs/${job.id}`)
+      if (result.data?.id) {
+        toast.success('Job posted! Notifying matched providers...')
+        router.push(`/jobs/${result.data.id}`)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to post job'
@@ -220,26 +255,58 @@ export default function AIChatPage() {
     }
   }
 
+  const toggleVoiceInput = () => {
+    if (recording) {
+      recognitionRef.current?.stop()
+      setRecording(false)
+      return
+    }
+
+    const SpeechRecognition = (
+      window as typeof window & {
+        SpeechRecognition?: SpeechRecognitionConstructor
+        webkitSpeechRecognition?: SpeechRecognitionConstructor
+      }
+    ).SpeechRecognition || (
+      window as typeof window & { webkitSpeechRecognition?: SpeechRecognitionConstructor }
+    ).webkitSpeechRecognition
+
+    if (!SpeechRecognition) {
+      setVoiceSupported(false)
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'hi-IN'
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript || '')
+        .join('')
+      setInput(transcript.slice(0, 500))
+    }
+    recognition.onend = () => setRecording(false)
+    recognition.onerror = () => setRecording(false)
+    recognitionRef.current = recognition
+    setRecording(true)
+    recognition.start()
+  }
+
   return (
     <div className="h-screen bg-surface flex flex-col">
       {/* Header */}
       <header className="flex-shrink-0 border-b border-surface-border glass">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => router.back()}
-              className="p-2 rounded-lg hover:bg-surface-card text-muted-foreground hover:text-white transition-colors"
-              title="Back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <Link 
-              href="/"
+            <button
+              onClick={() => router.push('/')}
               className="p-2 rounded-lg hover:bg-surface-card text-muted-foreground hover:text-white transition-colors"
               title="Home"
             >
-              <Users className="w-5 h-5" />
-            </Link>
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <button onClick={() => router.push('/')} className="hidden sm:inline text-sm text-muted-foreground hover:text-white transition-colors">Home</button>
             <Logo size="sm" showText={false} />
             <span className="font-display font-bold text-lg text-white hidden sm:block">GigMind AI</span>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
@@ -330,24 +397,41 @@ export default function AIChatPage() {
 
           {/* Input */}
           <div className="flex-shrink-0 border-t border-surface-border glass p-4">
-            <div className="max-w-2xl mx-auto flex gap-3">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Tell me what service you need..."
-                className="flex-1 px-4 py-3 rounded-xl bg-surface-card border border-surface-border text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
-                disabled={loading}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={loading || !input.trim()}
-                className="px-4 py-3 rounded-xl bg-brand-gradient text-white hover:opacity-90 transition-opacity disabled:opacity-30"
-              >
-                <Send className="w-5 h-5" />
-              </button>
+            <div className="max-w-2xl mx-auto">
+              <div className="flex gap-3">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  maxLength={500}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Tell me what service you need..."
+                  className="flex-1 px-4 py-3 rounded-xl bg-surface-card border border-surface-border text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
+                  disabled={loading}
+                />
+                {voiceSupported && (
+                  <button
+                    onClick={toggleVoiceInput}
+                    type="button"
+                    className={`px-4 py-3 rounded-xl border transition-colors ${recording ? 'bg-error/20 border-error text-error' : 'border-surface-border text-muted-foreground hover:text-white'}`}
+                    aria-label="Use voice input"
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
+                )}
+                <button
+                  onClick={sendMessage}
+                  disabled={loading || !input.trim()}
+                  className="px-4 py-3 rounded-xl bg-brand-gradient text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{recording ? 'Listening...' : 'Tap mic to speak in Hindi or English'}</span>
+                <span>{input.length}/500 characters</span>
+              </div>
             </div>
           </div>
         </div>

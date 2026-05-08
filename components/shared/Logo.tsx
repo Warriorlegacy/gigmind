@@ -23,14 +23,14 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
   return (
     <Link href="/" className={`flex items-center gap-3 group select-none ${className}`}>
       <div className="relative flex items-center justify-center" style={{ width: iconSize, height: iconSize }}>
-        {/* Animated Background Glow */}
+        {/* Background Glow */}
         <div 
-          className="absolute inset-0 bg-brand/30 rounded-full blur-[15px] group-hover:bg-brand/50 transition-all duration-700 opacity-60 animate-pulse"
+          className="absolute inset-0 bg-brand/30 rounded-full blur-[15px] group-hover:bg-brand/50 transition-all duration-700 opacity-60"
         />
         
         <svg
           viewBox="0 0 100 100"
-          className="w-full h-full relative z-10 drop-shadow-[0_0_10px_rgba(108,71,255,0.5)] transition-all duration-500 group-hover:scale-110"
+          className="w-full h-full relative z-10 drop-shadow-[0_0_10px_rgba(108,71,255,0.5)] hover:rotate-180 transition-transform duration-500"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
@@ -46,26 +46,17 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
 
-            {/* Animation for synapses */}
             <style>
               {`
-                @keyframes dash {
-                  to {
-                    stroke-dashoffset: 0;
-                  }
-                }
                 .synapse {
                   stroke-dasharray: 100;
-                  stroke-dashoffset: 100;
-                  animation: dash 3s linear infinite;
                   opacity: 0.3;
                 }
                 .node {
                   transition: all 0.3s ease;
                 }
-                .group:hover .synapse {
+                svg:hover .synapse {
                   opacity: 0.8;
-                  animation-duration: 1.5s;
                 }
               `}
             </style>
@@ -103,7 +94,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
           <circle cx="82" cy="50" r="6" fill="white" filter="url(#neonGlow)" className="node group-hover:scale-125" />
           
           {/* Central AI Nucleus */}
-          <circle cx="52" cy="50" r="3" fill="white" className="animate-pulse" />
+          <circle cx="52" cy="50" r="3" fill="white" />
         </svg>
       </div>
 
@@ -120,4 +111,3 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, className = '
 }
 
 export default Logo
-

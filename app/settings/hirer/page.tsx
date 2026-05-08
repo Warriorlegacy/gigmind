@@ -76,9 +76,9 @@ export default function HirerSettings() {
       .eq('id', user?.id)
 
     if (error) {
-      toast.error('Failed to update profile')
+      toast.error('Failed to save. Please try again.')
     } else {
-      toast.success('Profile updated!')
+      toast.success('Profile updated successfully!')
     }
     setSaving(false)
   }
@@ -346,4 +346,3 @@ export default function HirerSettings() {
     </div>
   )
 }
-

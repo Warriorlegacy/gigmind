@@ -1,50 +1,32 @@
 import Navigation from '@/components/shared/Navigation'
 
+const sections = [
+  ['1. Introduction', 'This Privacy Policy explains how GigMind collects, uses, stores, shares, and protects personal data under India’s Digital Personal Data Protection Act, 2023. By using GigMind, you consent to the data practices needed to operate a trusted AI-assisted service marketplace.'],
+  ['2. Data We Collect', 'We collect identity data, contact data, provider profile data, job and application data, messages, payment and escrow metadata, device and technical data, approximate location, support requests, and AI interaction content that you choose to submit.'],
+  ['3. How We Use Your Data', 'We use data to create accounts, match hirers with providers, generate AI-assisted job posts and proposals, process applications, support payments, prevent fraud, moderate content, improve safety, send notifications, and comply with legal obligations.'],
+  ['4. Storage and Security', 'Data is stored with managed cloud infrastructure and protected using authentication, Supabase row-level security, access controls, encryption in transit, and operational monitoring. We retain data only for as long as needed for marketplace, legal, tax, fraud-prevention, and dispute-resolution purposes.'],
+  ['5. Data Sharing', 'We do not sell personal data. We share limited data with providers, hirers, payment processors, authentication providers, email/SMS providers, analytics and hosting vendors, legal authorities when required, and internal administrators who need access to operate GigMind.'],
+  ['6. Your Rights', 'Under the DPDP Act 2023, you may request access, correction, completion, updating, erasure, grievance redressal, and withdrawal of consent where applicable. Some data may be retained when required for legal claims, safety, tax, payments, or fraud prevention.'],
+  ['7. Cookies', 'GigMind uses essential cookies for authentication and security, plus limited preference and analytics storage to improve performance and reliability. You can control browser storage through your device settings, but some features may stop working.'],
+  ['8. Contact', 'For privacy requests, account deletion, or DPDP grievances, contact team@gigmind.in. We aim to acknowledge privacy requests promptly and resolve valid requests within a reasonable period under applicable Indian law.'],
+]
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#0F0F13] text-white">
       <Navigation />
-      <div className="pt-32 pb-20 px-6 max-w-4xl mx-auto">
+      <main className="pt-32 pb-20 px-6 max-w-4xl mx-auto">
+        <p className="text-sm text-brand mb-3">Effective date: May 1, 2026</p>
         <h1 className="text-4xl font-bold mb-8 font-display">Privacy Policy</h1>
-        
         <div className="space-y-8 text-gray-400 text-sm leading-relaxed">
-          <section>
-            <h2 className="text-xl font-bold mb-4 text-white font-display">1. Introduction</h2>
-            <p>
-              Welcome to GigMind. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and tell you about your privacy rights and how the law protects you.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold mb-4 text-white font-display">2. Data We Collect</h2>
-            <p>We may collect, use, store and transfer different kinds of personal data about you which we have grouped together as follows:</p>
-            <ul className="list-disc ml-6 mt-2 space-y-2">
-              <li><span className="text-white font-medium">Identity Data:</span> includes first name, last name, username or similar identifier.</li>
-              <li><span className="text-white font-medium">Contact Data:</span> includes email address and telephone numbers.</li>
-              <li><span className="text-white font-medium">Profile Data:</span> includes your username and password, service interests, preferences, feedback and survey responses.</li>
-              <li><span className="text-white font-medium">Technical Data:</span> includes internet protocol (IP) address, your login data, browser type and version, time zone setting and location.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold mb-4 text-white font-display">3. How We Use Your Data</h2>
-            <p>
-              We will only use your personal data when the law allows us to. Most commonly, we will use your personal data to provide the services you requested, to manage your account, and to improve our platform through AI-driven insights.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-bold mb-4 text-white font-display">4. DPDP Act 2023 Compliance</h2>
-            <p>
-              In accordance with the Digital Personal Data Protection Act, 2023 (India), we ensure that your personal data is processed for a lawful purpose for which you have given your consent. You have the right to access, correct, and erase your personal data.
-            </p>
-          </section>
-
-          <section>
-            <p className="text-xs">Last updated: May 2026</p>
-          </section>
+          {sections.map(([title, body]) => (
+            <section key={title} className="rounded-2xl bg-[#1A1A24] border border-[#2A2A3A] p-6">
+              <h2 className="text-xl font-bold mb-4 text-white font-display">{title}</h2>
+              <p>{body}</p>
+            </section>
+          ))}
         </div>
-      </div>
+      </main>
     </div>
   )
 }
