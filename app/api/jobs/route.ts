@@ -15,15 +15,20 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get('limit') || '10')
   const from = (page - 1) * limit
 
+  let selectStr = '*, categories(name, slug, icon), profiles(full_name, avatar_url)'
+  if (category) {
+    selectStr = '*, categories!inner(name, slug, icon), profiles(full_name, avatar_url)'
+  }
+
   let query = supabase
     .from('jobs')
-    .select('*, categories(name, slug, icon), profiles(full_name, avatar_url)', { count: 'exact' })
+    .select(selectStr, { count: 'exact' })
     .eq('status', 'open')
     .order('created_at', { ascending: false })
     .range(from, from + limit - 1)
 
   if (category) query = query.eq('categories.slug', category)
-  if (city) query = query.ilike('city', `%${city}%`)
+  if (city && city !== 'All Cities') query = query.ilike('city', `%${city}%`)
   if (budgetMin) query = query.gte('budget_max', parseFloat(budgetMin))
   if (budgetMax) query = query.lte('budget_min', parseFloat(budgetMax))
   if (search) {

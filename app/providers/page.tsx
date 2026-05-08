@@ -8,6 +8,7 @@ import { formatINR } from '@/lib/utils/formatting'
 import { Search, MapPin, Star, Shield, MessageSquare, Eye, Filter } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { CATEGORIES, INDIAN_CITIES } from '@/lib/constants'
 
 interface Provider {
   id: string
@@ -25,26 +26,11 @@ interface Provider {
   provider_categories: { category_id: string; categories: { slug: string; name: string; icon: string } }[]
 }
 
-const CATEGORY_TABS = [
-  { slug: '', name: 'All' },
-  { slug: 'real-estate', name: 'Real Estate' },
-  { slug: 'medical', name: 'Medical' },
-  { slug: 'home-repair', name: 'Home Repair' },
-  { slug: 'interior-design', name: 'Interior' },
-  { slug: 'security', name: 'Security' },
-  { slug: 'cleaning', name: 'Cleaning' },
-  { slug: 'it-services', name: 'IT' },
-]
-
 const RATING_FILTERS = [
   { value: '', label: 'All' },
   { value: '3', label: '3+' },
   { value: '4', label: '4+' },
   { value: '4.5', label: '4.5+' },
-]
-
-const INDIAN_CITIES = [
-  'All Cities', 'Delhi', 'Mumbai', 'Bangalore', 'Lucknow', 'Kanpur', 'Jaipur', 'Hyderabad', 'Pune', 'Ahmedabad', 'Bhopal', 'Nagpur', 'Indore', 'Patna', 'Varanasi', 'Agra', 'Allahabad', 'Meerut', 'Ghaziabad', 'Noida', 'Gurugram',
 ]
 
 export default function ProvidersPage() {
@@ -148,12 +134,12 @@ export default function ProvidersPage() {
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-white">Find Providers</h1>
-            <p className="text-muted-foreground text-sm mt-1">Verified professionals across 12+ service categories</p>
+            <p className="text-muted-foreground text-sm mt-1">Verified professionals across {CATEGORIES.length - 1} categories</p>
           </div>
 
           {/* Category Tabs */}
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-4 mb-6">
-            {CATEGORY_TABS.map((tab) => (
+            {CATEGORIES.map((tab) => (
               <button
                 key={tab.slug}
                 onClick={() => setCategory(tab.slug)}
@@ -250,7 +236,7 @@ export default function ProvidersPage() {
               <div className="w-16 h-16 rounded-2xl bg-surface-card flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-display text-lg font-bold text-white mb-2">No providers yet{category ? ` in ${CATEGORY_TABS.find((tab) => tab.slug === category)?.name || category}` : ''}.</h3>
+              <h3 className="font-display text-lg font-bold text-white mb-2">No providers found</h3>
               <p className="text-muted-foreground text-sm mb-6">Be the first to offer this service on GigMind.</p>
               <Link href="/settings/provider" className="px-6 py-3 rounded-xl bg-brand-gradient text-white font-medium inline-flex items-center gap-2">
                 Join as Provider

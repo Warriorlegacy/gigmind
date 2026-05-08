@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Navigation from '@/components/shared/Navigation'
 import { formatINR, formatRelativeTime } from '@/lib/utils/formatting'
-import { Search, MapPin, IndianRupee, Clock, Users, Filter, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Search, MapPin, IndianRupee, Clock, Users, Filter, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CATEGORIES, INDIAN_CITIES } from '@/lib/constants'
 
 interface Job {
   id: string
@@ -21,26 +22,6 @@ interface Job {
   categories: { name: string; slug: string; icon: string } | null
   profiles: { full_name: string; avatar_url: string | null } | null
 }
-
-const CATEGORIES = [
-  { slug: '', name: 'All' },
-  { slug: 'real-estate', name: 'Real Estate' },
-  { slug: 'medical', name: 'Medical' },
-  { slug: 'home-repair', name: 'Home Repair' },
-  { slug: 'office-assistance', name: 'Office Help' },
-  { slug: 'interior-design', name: 'Interior' },
-  { slug: 'security', name: 'Security' },
-  { slug: 'human-resources', name: 'HR' },
-  { slug: 'cleaning', name: 'Cleaning' },
-  { slug: 'transport', name: 'Transport' },
-  { slug: 'education', name: 'Education' },
-  { slug: 'event-management', name: 'Events' },
-  { slug: 'it-services', name: 'IT' },
-]
-
-const INDIAN_CITIES = [
-  'All Cities', 'Lucknow', 'Kanpur', 'Varanasi', 'Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Jaipur',
-]
 
 export default function JobsPage() {
   const searchParams = useSearchParams()
@@ -72,6 +53,8 @@ export default function JobsPage() {
     setJobs(data.data || [])
     setTotalPages(data.totalPages || 1)
     setLoading(false)
+    
+    // Sync URL
     const nextUrl = new URLSearchParams(searchParams.toString())
     if (city && city !== 'All Cities') nextUrl.set('city', city)
     else nextUrl.delete('city')
@@ -136,15 +119,15 @@ export default function JobsPage() {
                 <h3 className="font-medium text-white text-sm">Filters</h3>
                 <button onClick={() => { setCategory(''); setCity('All Cities'); }} className="text-xs text-brand hover:text-brand-light">Clear All</button>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1.5">Category</label>
+                  <label className="block text-xs text-muted-foreground mb-2">Category</label>
                   <div className="flex flex-wrap gap-2">
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat.slug}
                         onClick={() => { setCategory(cat.slug); setPage(1) }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-medium transition-colors ${
                           category === cat.slug
                             ? 'bg-brand text-white'
                             : 'bg-surface border border-surface-border text-muted-foreground hover:text-white'
@@ -194,11 +177,14 @@ export default function JobsPage() {
               <div className="w-16 h-16 rounded-2xl bg-surface-card flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-display text-lg font-bold text-white mb-2">No jobs posted yet{city !== 'All Cities' ? ` in ${city}` : ''}</h3>
-              <p className="text-muted-foreground text-sm mb-6">Be the first to post a job and get matched with trusted providers.</p>
-              <Link href="/ai-chat" className="px-6 py-3 rounded-xl bg-brand-gradient text-white font-medium inline-flex items-center gap-2">
-                Post a Job <Plus className="w-4 h-4" />
-              </Link>
+              <h3 className="font-display text-lg font-bold text-white mb-2">No jobs found</h3>
+              <p className="text-muted-foreground text-sm mb-6">Try adjusting your filters or search keywords.</p>
+              <button 
+                onClick={() => { setCategory(''); setCity('All Cities'); setSearch(''); }}
+                className="px-6 py-3 rounded-xl bg-surface border border-surface-border text-white font-medium hover:bg-surface-hover transition-colors"
+              >
+                Clear All Filters
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -212,7 +198,7 @@ export default function JobsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         {job.categories && (
-                          <span className="px-2 py-0.5 rounded-md bg-brand/10 text-brand text-xs font-medium">
+                          <span className="px-2 py-0.5 rounded-md bg-brand/10 text-brand text-[10px] font-medium uppercase tracking-wider">
                             {job.categories.icon} {job.categories.name}
                           </span>
                         )}

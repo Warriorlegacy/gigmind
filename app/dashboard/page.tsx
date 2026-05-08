@@ -106,7 +106,7 @@ export default function DashboardPage() {
 
     const { data: convData } = await supabase
       .from('conversations')
-      .select('*, profiles!conversations_provider_id_fkey(full_name), profiles!conversations_hirer_id_fkey(full_name)')
+      .select('*, profiles!provider_id(full_name), profiles!hirer_id(full_name)')
       .or(`hirer_id.eq.${user.id},provider_id.eq.${user.id}`)
       .order('last_message_at', { ascending: false })
       .limit(5)
@@ -128,7 +128,7 @@ export default function DashboardPage() {
         const { data: apps } = await supabase
           .from('applications')
           .select('*, jobs(title, status, budget_min, budget_max, categories(name, icon))')
-          .eq('provider_id', provProfile.id)
+          .eq('applicant_id', user.id)
           .order('created_at', { ascending: false })
           .limit(5)
         
@@ -138,7 +138,7 @@ export default function DashboardPage() {
         const { count: appCount } = await supabase
           .from('applications')
           .select('*', { count: 'exact', head: true })
-          .eq('provider_id', provProfile.id)
+          .eq('applicant_id', user.id)
 
         setStats(prev => ({ ...prev, applications_count: appCount || 0 }))
 
@@ -161,7 +161,7 @@ export default function DashboardPage() {
       // Hirer specific logic: Fetch applications received for my jobs
       const { data: receivedApps } = await supabase
         .from('applications')
-        .select('*, jobs!inner(hirer_id, title), provider_profiles(profiles(full_name, avatar_url))')
+        .select('*, jobs!inner(hirer_id, title), profiles:applicant_id(full_name, avatar_url)')
         .eq('jobs.hirer_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5)
@@ -610,7 +610,7 @@ export default function DashboardPage() {
                       {applications.map((app) => (
                         <Link key={app.id} href={`/jobs/${app.job_id}`} className="block p-3 rounded-xl bg-surface hover:bg-surface-hover transition-colors">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-white text-sm">{app.provider_profiles?.profiles?.full_name}</span>
+                            <span className="font-medium text-white text-sm">{(app as any).profiles?.full_name}</span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                               app.status === 'hired' ? 'bg-success-bg text-success' :
                               app.status === 'shortlisted' ? 'bg-info-bg text-info' :
